@@ -1,4 +1,32 @@
-baseurl: "https://xionglinxin.github.io"
-remote_theme: pages-themes/hacker@v0.2.0
+# 网站基本信息
+title: Wblog
+description: 终身学习
+author: linxin
+email: 354764230@qq.com
+baseurl: ""
+url: "https://xionglinxin.github.io"
+
+# 主题配置
+remote_theme: "jekyll/minima@1e8a445"
+
+# 显示设置
+show_excerpts: true
+
+# 社交账号
+minima:
+  social_links:
+    - { platform: github, user_url: "https://github.com/xionglinxin" }
+
+
+# 构建设置
+markdown: kramdown
 plugins:
-- jekyll-remote-theme # add this line to the plugins list if you already have one
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# 排除文件
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
