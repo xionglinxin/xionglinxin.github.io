@@ -1,1 +1,36 @@
+# 网站基本信息
+title: Wblog
+description: 终身学习
+author: linxin
+email: 354764230@qq.com
+baseurl: ""
+url: "https://xionglinxin.github.io"
+
+# 主题配置
 remote_theme: "jekyll/minima@1e8a445"
+
+# 显示设置
+show_excerpts: true
+
+# 社交账号
+minima:
+  social_links:
+    - { platform: github, user_url: "https://github.com/xionglinxin" }
+
+# 评论系统（Disqus）
+# 如需启用，请在 https://disqus.com 注册并填写 shortname
+# disqus:
+#   shortname: your-disqus-shortname
+
+# 构建设置
+markdown: kramdown
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# 排除文件
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
