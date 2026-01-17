@@ -1,36 +1,96 @@
-# 网站基本信息
-title: Wblog
-description: 终身学习
-author: linxin
-email: 354764230@qq.com
-baseurl: ""
-url: "https://xionglinxin.github.io"
+# Hexo 配置文件
+## 文档: https://hexo.io/docs/configuration.html
+## 源码: https://github.com/hexojs/hexo/
 
-# 主题配置
-remote_theme: "jekyll/minima@1e8a445"
+# 网站信息
+title: Wblog                    # 网站标题
+subtitle: ''                    # 副标题
+description: 终身学习           # 网站描述
+keywords:                       # 关键词
+author: linxin                  # 作者
+language: zh-CN                 # 语言
+timezone: 'Asia/Shanghai'       # 时区
 
-# 显示设置
-show_excerpts: true
+# URL 配置
+## 设置网站 URL，GitHub Pages 格式: https://username.github.io
+url: https://xionglinxin.github.io
+permalink: :year/:month/:day/:title/  # 文章链接格式
+permalink_defaults:
+pretty_urls:
+  trailing_index: true          # 是否保留链接末尾的 index.html
+  trailing_html: true           # 是否保留链接末尾的 .html
 
-# 社交账号
-minima:
-  social_links:
-    - { platform: github, user_url: "https://github.com/xionglinxin" }
+# 目录配置
+source_dir: source              # 源文件目录
+public_dir: public              # 生成文件目录
+tag_dir: tags                   # 标签目录
+archive_dir: archives           # 归档目录
+category_dir: categories        # 分类目录
+code_dir: downloads/code        # 代码目录
+i18n_dir: :lang                 # 国际化目录
+skip_render:                    # 跳过渲染的文件
 
-# 评论系统（Disqus）
-# 如需启用，请在 https://disqus.com 注册并填写 shortname
-# disqus:
-#   shortname: your-disqus-shortname
+# 写作配置
+new_post_name: :title.md        # 新文章文件名格式
+default_layout: post            # 默认布局
+titlecase: false                # 标题转换为首字母大写
+external_link:
+  enable: true                  # 在新标签页打开外部链接
+  field: site                   # 应用范围
+  exclude: ''
+filename_case: 0                # 文件名大小写 (0:不变, 1:小写, 2:大写)
+render_drafts: false            # 是否渲染草稿
+post_asset_folder: false        # 是否启用文章资源文件夹
+relative_link: false            # 是否使用相对链接
+future: true                    # 是否显示未来日期的文章
+syntax_highlighter: highlight.js # 代码高亮工具
+highlight:
+  line_number: true             # 显示行号
+  auto_detect: false            # 自动检测语言
+  tab_replace: ''
+  wrap: true
+  hljs: false
+prismjs:
+  preprocess: true
+  line_number: true
+  tab_replace: ''
 
-# 构建设置
-markdown: kramdown
-plugins:
-  - jekyll-feed
-  - jekyll-seo-tag
+# 首页配置
+index_generator:
+  path: ''                      # 首页路径
+  per_page: 10                  # 每页文章数
+  order_by: -date               # 排序方式 (按日期降序)
 
-# 排除文件
+# 分类和标签
+default_category: uncategorized # 默认分类
+category_map:                   # 分类映射
+tag_map:                        # 标签映射
+
+# 元数据
+meta_generator: true            # 是否生成 meta generator 标签
+
+# 日期时间格式
+date_format: YYYY-MM-DD         # 日期格式
+time_format: HH:mm:ss           # 时间格式
+updated_option: 'mtime'         # 更新时间选项 (mtime/date/empty)
+
+# 分页配置
+per_page: 10                    # 每页文章数 (0 表示禁用分页)
+pagination_dir: page            # 分页目录
+
+# 包含/排除文件
+include:
 exclude:
-  - Gemfile
-  - Gemfile.lock
-  - node_modules
-  - vendor
+ignore:
+
+# 扩展配置
+## 插件: https://hexo.io/plugins/
+## 主题: https://hexo.io/themes/
+theme: landscape                # 使用的主题
+
+# 部署配置
+## 文档: https://hexo.io/docs/one-command-deployment
+deploy:
+  type: git                     # 部署类型
+  repo: https://github.com/xionglinxin/xionglinxin.github.io.git  # 仓库地址
+  branch: main                  # 分支名称
