@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="google-site-verification" content="TZE0rZyIqLl10trYu3BWBWa1Vmz6HFwhb2OcNEK4u-s" />
+     <link rel="shortcut icon" href= /img/favicon.ico >
+    <title>
+        Wblog
+    </title>
+    <meta name="description" content= 终身学习，记录成长轨迹 >
+    <meta name="keywords" content= Blog,Hexo,技术,学习,linxin >
+    
+<link rel="stylesheet" href="/libs/highlight/styles/monokai-sublime.css">
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body id="bodyx">
+    <div class="hd posts">
+    <a href="/index.html"><i class="fa fa-home
+ replay-btn" aria-hidden="true"></i></a>
+    <div class="post-title">
+        <p>
+            SQL 常见函数笔记
+        </p>
+        <hr>
+    </div>
+    <div class="post-content">
+        <blockquote>
+<p>本文整理了 MySQL 中常用的 SQL 函数，包括字符串处理、字符编码、长度计算和条件判断等，每个函数都配有通俗易懂的说明和实用示例。</p>
+</blockquote>
+<h2 id="一、常用内置函数：查看当前环境信息"><a href="#一、常用内置函数：查看当前环境信息" class="headerlink" title="一、常用内置函数：查看当前环境信息"></a>一、常用内置函数：查看当前环境信息</h2><p>这三个函数可以帮助你快速了解当前的数据库连接信息，非常实用！</p>
+<h3 id="USER-查看当前登录账号"><a href="#USER-查看当前登录账号" class="headerlink" title="USER() - 查看当前登录账号"></a><code>USER()</code> - 查看当前登录账号</h3><p><strong>作用</strong>：返回当前连接的数据库账号和来源地址</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">USER</span>();</span><br><span class="line"><span class="comment">-- 结果示例：root@localhost</span></span><br><span class="line"><span class="comment">-- 格式：账号名@来源地址</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="DATABASE-查看当前使用的数据库"><a href="#DATABASE-查看当前使用的数据库" class="headerlink" title="DATABASE() - 查看当前使用的数据库"></a><code>DATABASE()</code> - 查看当前使用的数据库</h3><p><strong>作用</strong>：返回当前正在使用的数据库名称</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> DATABASE();</span><br><span class="line"><span class="comment">-- 结果示例：mydb</span></span><br><span class="line"><span class="comment">-- 注意：如果没有使用 USE 命令选择数据库，可能返回 NULL</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="VERSION-查看数据库版本"><a href="#VERSION-查看数据库版本" class="headerlink" title="VERSION() - 查看数据库版本"></a><code>VERSION()</code> - 查看数据库版本</h3><p><strong>作用</strong>：返回 MySQL 数据库的版本号</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> VERSION();</span><br><span class="line"><span class="comment">-- 结果示例：8.0.33</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="一次性查询所有信息"><a href="#一次性查询所有信息" class="headerlink" title="一次性查询所有信息"></a>一次性查询所有信息</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">USER</span>(), DATABASE(), VERSION();</span><br><span class="line"><span class="comment">-- 一次性获取账号、数据库名和版本号</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="二、字符串截取函数：灵活提取字符串片段"><a href="#二、字符串截取函数：灵活提取字符串片段" class="headerlink" title="二、字符串截取函数：灵活提取字符串片段"></a>二、字符串截取函数：灵活提取字符串片段</h2><p>字符串截取是 SQL 中最常用的操作之一，MySQL 提供了多种函数来实现这个功能。</p>
+<h3 id="2-1-SUBSTRING-SUBSTR-MID-从指定位置截取"><a href="#2-1-SUBSTRING-SUBSTR-MID-从指定位置截取" class="headerlink" title="2.1 SUBSTRING() &#x2F; SUBSTR() &#x2F; MID() - 从指定位置截取"></a>2.1 <code>SUBSTRING()</code> &#x2F; <code>SUBSTR()</code> &#x2F; <code>MID()</code> - 从指定位置截取</h3><p>这三个函数在 MySQL 中<strong>完全等价</strong>，你可以根据习惯选择任意一个使用。</p>
+<p><strong>语法格式</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">SUBSTRING</span>(字符串, 起始位置)</span><br><span class="line"><span class="built_in">SUBSTRING</span>(字符串, 起始位置, 截取长度)</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 以下写法效果相同</span></span><br><span class="line">SUBSTR(字符串, 起始位置, 截取长度)</span><br><span class="line">MID(字符串, 起始位置, 截取长度)</span><br></pre></td></tr></table></figure>
+
+<p><strong>重要规则</strong>：</p>
+<ul>
+<li>⚠️ <strong>起始位置从 1 开始</strong>（不是 0！）</li>
+<li>✅ 起始位置可以是负数：负数表示从字符串末尾往前数</li>
+<li>✅ 如果省略截取长度，则取到字符串末尾</li>
+</ul>
+<p><strong>实用示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 从第1个字符开始，取3个字符</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">SUBSTRING</span>(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">1</span>, <span class="number">3</span>);   <span class="comment">-- 结果：abc</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 从第3个字符开始，取到末尾</span></span><br><span class="line"><span class="keyword">SELECT</span> SUBSTR(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">3</span>);          <span class="comment">-- 结果：cdef</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 从第2个字符开始，取4个字符</span></span><br><span class="line"><span class="keyword">SELECT</span> MID(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">2</span>, <span class="number">4</span>);          <span class="comment">-- 结果：bcde</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 使用负数：从倒数第2个字符开始取到末尾</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">SUBSTRING</span>(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">-2</span>);      <span class="comment">-- 结果：ef</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-LEFT-从左边截取"><a href="#2-2-LEFT-从左边截取" class="headerlink" title="2.2 LEFT() - 从左边截取"></a>2.2 <code>LEFT()</code> - 从左边截取</h3><p><strong>作用</strong>：从字符串的左边开始截取指定长度的字符</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">LEFT</span>(字符串, 长度)</span><br></pre></td></tr></table></figure>
+
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">LEFT</span>(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">3</span>);           <span class="comment">-- 结果：abc（取左边3个字符）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">LEFT</span>(<span class="keyword">USER</span>(), <span class="number">4</span>);             <span class="comment">-- 取当前账号的前4个字符</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-RIGHT-从右边截取"><a href="#2-3-RIGHT-从右边截取" class="headerlink" title="2.3 RIGHT() - 从右边截取"></a>2.3 <code>RIGHT()</code> - 从右边截取</h3><p><strong>作用</strong>：从字符串的右边开始截取指定长度的字符</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">RIGHT</span>(字符串, 长度)</span><br></pre></td></tr></table></figure>
+
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">RIGHT</span>(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">3</span>);          <span class="comment">-- 结果：def（取右边3个字符）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">RIGHT</span>(VERSION(), <span class="number">3</span>);         <span class="comment">-- 取版本号的最后3个字符</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-4-常见组合用法"><a href="#2-4-常见组合用法" class="headerlink" title="2.4 常见组合用法"></a>2.4 常见组合用法</h3><h4 id="取第-n-位字符（只取1个字符）"><a href="#取第-n-位字符（只取1个字符）" class="headerlink" title="取第 n 位字符（只取1个字符）"></a>取第 n 位字符（只取1个字符）</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">SUBSTRING</span>(<span class="string">&#x27;abcdef&#x27;</span>, <span class="number">4</span>, <span class="number">1</span>);   <span class="comment">-- 结果：d（第4个字符）</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="提取前缀或后缀"><a href="#提取前缀或后缀" class="headerlink" title="提取前缀或后缀"></a>提取前缀或后缀</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 获取数据库名的首字母</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">LEFT</span>(DATABASE(), <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 获取账号的后缀部分（如 @localhost）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">RIGHT</span>(<span class="keyword">USER</span>(), <span class="number">9</span>);</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="三、字符编码相关函数：字符与数字的转换"><a href="#三、字符编码相关函数：字符与数字的转换" class="headerlink" title="三、字符编码相关函数：字符与数字的转换"></a>三、字符编码相关函数：字符与数字的转换</h2><h3 id="3-1-ASCII-获取字符的编码值"><a href="#3-1-ASCII-获取字符的编码值" class="headerlink" title="3.1 ASCII() - 获取字符的编码值"></a>3.1 <code>ASCII()</code> - 获取字符的编码值</h3><p><strong>作用</strong>：返回字符串<strong>第一个字符</strong>的 ASCII 编码值（数字）</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ASCII(字符串)</span><br></pre></td></tr></table></figure>
+
+<p><strong>重要规则</strong>：</p>
+<ul>
+<li>只取第一个字符（<code>&#39;abc&#39;</code> 只看 <code>&#39;a&#39;</code>）</li>
+<li>空字符串 <code>&#39;&#39;</code> → 返回 <code>0</code></li>
+<li><code>NULL</code> → 返回 <code>NULL</code></li>
+</ul>
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="string">&#x27;A&#x27;</span>);        <span class="comment">-- 结果：65</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="string">&#x27;a&#x27;</span>);        <span class="comment">-- 结果：97（小写字母）</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="string">&#x27;0&#x27;</span>);        <span class="comment">-- 结果：48（数字0）</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="string">&#x27;abc&#x27;</span>);      <span class="comment">-- 结果：97（只看第一个字符&#x27;a&#x27;）</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="string">&#x27;&#x27;</span>);         <span class="comment">-- 结果：0</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="keyword">NULL</span>);       <span class="comment">-- 结果：NULL</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>配合截取函数使用</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 获取 &#x27;admin&#x27; 第1个字符的编码</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="built_in">SUBSTRING</span>(<span class="string">&#x27;admin&#x27;</span>, <span class="number">1</span>, <span class="number">1</span>));  <span class="comment">-- 结果：97</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 获取 &#x27;admin&#x27; 第2个字符的编码</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="built_in">SUBSTRING</span>(<span class="string">&#x27;admin&#x27;</span>, <span class="number">2</span>, <span class="number">1</span>));  <span class="comment">-- 结果：100</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 获取当前账号第1个字符的编码</span></span><br><span class="line"><span class="keyword">SELECT</span> ASCII(<span class="built_in">SUBSTRING</span>(<span class="keyword">USER</span>(), <span class="number">1</span>, <span class="number">1</span>));</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-CHAR-将编码值转换为字符"><a href="#3-2-CHAR-将编码值转换为字符" class="headerlink" title="3.2 CHAR() - 将编码值转换为字符"></a>3.2 <code>CHAR()</code> - 将编码值转换为字符</h3><p><strong>作用</strong>：把数字编码转换成对应的字符（与 <code>ASCII()</code> 互逆）</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">CHAR</span>(编码值)</span><br><span class="line"><span class="type">CHAR</span>(编码<span class="number">1</span>, 编码<span class="number">2</span>, 编码<span class="number">3</span>, ...)  <span class="comment">-- 可以一次转换多个字符</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="type">CHAR</span>(<span class="number">65</span>);              <span class="comment">-- 结果：&#x27;A&#x27;</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="type">CHAR</span>(<span class="number">97</span>,<span class="number">98</span>,<span class="number">99</span>);        <span class="comment">-- 结果：&#x27;abc&#x27;（97=a, 98=b, 99=c）</span></span><br><span class="line"><span class="keyword">SELECT</span> CONCAT(<span class="type">CHAR</span>(<span class="number">97</span>), <span class="string">&#x27;dm&#x27;</span>);<span class="comment">-- 结果：&#x27;adm&#x27;（拼接字符串）</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="ASCII-编码对照表"><a href="#ASCII-编码对照表" class="headerlink" title="ASCII 编码对照表"></a>ASCII 编码对照表</h3><table>
+<thead>
+<tr>
+<th>十进制</th>
+<th>十六进制</th>
+<th>字符</th>
+<th></th>
+<th>十进制</th>
+<th>十六进制</th>
+<th>字符</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>48</td>
+<td>30</td>
+<td>0</td>
+<td></td>
+<td>65</td>
+<td>41</td>
+<td>A</td>
+</tr>
+<tr>
+<td>49</td>
+<td>31</td>
+<td>1</td>
+<td></td>
+<td>66</td>
+<td>42</td>
+<td>B</td>
+</tr>
+<tr>
+<td>50</td>
+<td>32</td>
+<td>2</td>
+<td></td>
+<td>67</td>
+<td>43</td>
+<td>C</td>
+</tr>
+<tr>
+<td>51</td>
+<td>33</td>
+<td>3</td>
+<td></td>
+<td>68</td>
+<td>44</td>
+<td>D</td>
+</tr>
+<tr>
+<td>52</td>
+<td>34</td>
+<td>4</td>
+<td></td>
+<td>69</td>
+<td>45</td>
+<td>E</td>
+</tr>
+<tr>
+<td>53</td>
+<td>35</td>
+<td>5</td>
+<td></td>
+<td>70</td>
+<td>46</td>
+<td>F</td>
+</tr>
+<tr>
+<td>54</td>
+<td>36</td>
+<td>6</td>
+<td></td>
+<td>71</td>
+<td>47</td>
+<td>G</td>
+</tr>
+<tr>
+<td>55</td>
+<td>37</td>
+<td>7</td>
+<td></td>
+<td>72</td>
+<td>48</td>
+<td>H</td>
+</tr>
+<tr>
+<td>56</td>
+<td>38</td>
+<td>8</td>
+<td></td>
+<td>73</td>
+<td>49</td>
+<td>I</td>
+</tr>
+<tr>
+<td>57</td>
+<td>39</td>
+<td>9</td>
+<td></td>
+<td>74</td>
+<td>4A</td>
+<td>J</td>
+</tr>
+<tr>
+<td>…</td>
+<td>…</td>
+<td>…</td>
+<td></td>
+<td>…</td>
+<td>…</td>
+<td>…</td>
+</tr>
+<tr>
+<td>97</td>
+<td>61</td>
+<td>a</td>
+<td></td>
+<td>122</td>
+<td>7A</td>
+<td>z</td>
+</tr>
+</tbody></table>
+<p><strong>常用字符编码速查</strong>：</p>
+<ul>
+<li>数字 0-9：48-57</li>
+<li>大写字母 A-Z：65-90</li>
+<li>小写字母 a-z：97-122</li>
+</ul>
+<hr>
+<h2 id="四、字符串长度函数：字节长度-vs-字符长度"><a href="#四、字符串长度函数：字节长度-vs-字符长度" class="headerlink" title="四、字符串长度函数：字节长度 vs 字符长度"></a>四、字符串长度函数：字节长度 vs 字符长度</h2><h3 id="4-1-LENGTH-返回字节长度"><a href="#4-1-LENGTH-返回字节长度" class="headerlink" title="4.1 LENGTH() - 返回字节长度"></a>4.1 <code>LENGTH()</code> - 返回字节长度</h3><p><strong>作用</strong>：返回字符串占用的<strong>字节数</strong>（bytes）</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">LENGTH(字符串)</span><br></pre></td></tr></table></figure>
+
+<p><strong>重要说明</strong>：</p>
+<ul>
+<li>⚠️ 这是<strong>字节长度</strong>，不是字符个数！</li>
+<li>在 UTF-8 编码下：<ul>
+<li>英文字符：1 字节&#x2F;字符</li>
+<li>中文字符：通常 3 字节&#x2F;字符</li>
+<li>Emoji 表情：通常 4 字节&#x2F;字符</li>
+</ul>
+</li>
+<li>所以 <code>LENGTH()</code> 的结果可能大于实际字符数</li>
+</ul>
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> LENGTH(<span class="string">&#x27;abc&#x27;</span>);        <span class="comment">-- 结果：3（3个英文字符 = 3字节）</span></span><br><span class="line"><span class="keyword">SELECT</span> LENGTH(<span class="string">&#x27;&#x27;</span>);            <span class="comment">-- 结果：0</span></span><br><span class="line"><span class="keyword">SELECT</span> LENGTH(<span class="keyword">NULL</span>);          <span class="comment">-- 结果：NULL</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-CHAR-LENGTH-CHARACTER-LENGTH-返回字符个数"><a href="#4-2-CHAR-LENGTH-CHARACTER-LENGTH-返回字符个数" class="headerlink" title="4.2 CHAR_LENGTH() &#x2F; CHARACTER_LENGTH() - 返回字符个数"></a>4.2 <code>CHAR_LENGTH()</code> &#x2F; <code>CHARACTER_LENGTH()</code> - 返回字符个数</h3><p><strong>作用</strong>：返回字符串的<strong>字符个数</strong>（characters），更符合”有多少个字”的直观理解</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CHAR_LENGTH</span>(字符串)</span><br><span class="line"><span class="keyword">CHARACTER_LENGTH</span>(字符串)  <span class="comment">-- 与 CHAR_LENGTH() 完全等价</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(<span class="string">&#x27;abc&#x27;</span>);       <span class="comment">-- 结果：3（3个字符）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHARACTER_LENGTH</span>(<span class="string">&#x27;abc&#x27;</span>);  <span class="comment">-- 结果：3（同上）</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-长度函数的区别对比"><a href="#4-3-长度函数的区别对比" class="headerlink" title="4.3 长度函数的区别对比"></a>4.3 长度函数的区别对比</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 英文：字节数 = 字符数</span></span><br><span class="line"><span class="keyword">SELECT</span> LENGTH(<span class="string">&#x27;hello&#x27;</span>);        <span class="comment">-- 5（字节）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(<span class="string">&#x27;hello&#x27;</span>);   <span class="comment">-- 5（字符）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 中文：字节数 &gt; 字符数</span></span><br><span class="line"><span class="keyword">SELECT</span> LENGTH(<span class="string">&#x27;你好&#x27;</span>);         <span class="comment">-- 6（字节，每个汉字3字节）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(<span class="string">&#x27;你好&#x27;</span>);    <span class="comment">-- 2（字符，2个汉字）</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-常见组合用法"><a href="#4-4-常见组合用法" class="headerlink" title="4.4 常见组合用法"></a>4.4 常见组合用法</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 获取当前账号/数据库名/版本号的长度（建议用 CHAR_LENGTH）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(<span class="keyword">USER</span>());</span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(DATABASE());</span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">CHAR_LENGTH</span>(VERSION());</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 配合截取：取第 n 位字符（从 1 开始计数）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">SUBSTRING</span>(<span class="keyword">USER</span>(), <span class="number">1</span>, <span class="number">1</span>);      <span class="comment">-- 第1个字符</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">SUBSTRING</span>(DATABASE(), <span class="number">2</span>, <span class="number">1</span>);  <span class="comment">-- 第2个字符</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、条件判断函数：让-SQL-更智能"><a href="#五、条件判断函数：让-SQL-更智能" class="headerlink" title="五、条件判断函数：让 SQL 更智能"></a>五、条件判断函数：让 SQL 更智能</h2><h3 id="5-1-IF-三元条件判断"><a href="#5-1-IF-三元条件判断" class="headerlink" title="5.1 IF() - 三元条件判断"></a>5.1 <code>IF()</code> - 三元条件判断</h3><p><strong>作用</strong>：根据条件返回不同的值（类似编程语言的三元表达式）</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">IF(条件, 条件为真时的值, 条件为假时的值)</span><br></pre></td></tr></table></figure>
+
+<p><strong>规则</strong>：</p>
+<ul>
+<li>条件为 TRUE（非0且非NULL）→ 返回第二个参数</li>
+<li>条件为 FALSE（0 或 NULL）→ 返回第三个参数</li>
+</ul>
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 基本用法</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(<span class="number">1</span><span class="operator">=</span><span class="number">1</span>, <span class="string">&#x27;yes&#x27;</span>, <span class="string">&#x27;no&#x27;</span>);          <span class="comment">-- 结果：yes</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(<span class="number">1</span><span class="operator">=</span><span class="number">2</span>, <span class="string">&#x27;yes&#x27;</span>, <span class="string">&#x27;no&#x27;</span>);          <span class="comment">-- 结果：no</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(<span class="keyword">NULL</span>, <span class="string">&#x27;yes&#x27;</span>, <span class="string">&#x27;no&#x27;</span>);         <span class="comment">-- 结果：no</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 数值比较</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(<span class="number">5</span><span class="operator">&gt;</span><span class="number">3</span>, <span class="number">100</span>, <span class="number">200</span>);             <span class="comment">-- 结果：100</span></span><br><span class="line"></span><br><span class="line"><span class="comment">-- 配合字符串函数：判断账号第1位是否为 &#x27;r&#x27;</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(<span class="built_in">SUBSTRING</span>(<span class="keyword">USER</span>(),<span class="number">1</span>,<span class="number">1</span>)<span class="operator">=</span><span class="string">&#x27;r&#x27;</span>, <span class="number">1</span>, <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 配合 ASCII：判断第1位字符编码是否大于 100</span></span><br><span class="line"><span class="keyword">SELECT</span> IF(ASCII(<span class="built_in">SUBSTRING</span>(<span class="keyword">USER</span>(),<span class="number">1</span>,<span class="number">1</span>))<span class="operator">&gt;</span><span class="number">100</span>, <span class="number">1</span>, <span class="number">0</span>);</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-IFNULL-处理-NULL-值"><a href="#5-2-IFNULL-处理-NULL-值" class="headerlink" title="5.2 IFNULL() - 处理 NULL 值"></a>5.2 <code>IFNULL()</code> - 处理 NULL 值</h3><p><strong>作用</strong>：如果第一个值为 NULL，则返回第二个值（默认值），否则返回第一个值</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">IFNULL(值<span class="number">1</span>, 默认值)</span><br></pre></td></tr></table></figure>
+
+<p><strong>使用场景</strong>：避免 NULL 值导致的问题，提供默认值</p>
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> IFNULL(<span class="keyword">NULL</span>, <span class="string">&#x27;fallback&#x27;</span>);      <span class="comment">-- 结果：fallback</span></span><br><span class="line"><span class="keyword">SELECT</span> IFNULL(<span class="string">&#x27;abc&#x27;</span>, <span class="string">&#x27;fallback&#x27;</span>);     <span class="comment">-- 结果：abc</span></span><br><span class="line"><span class="keyword">SELECT</span> IFNULL(DATABASE(), <span class="string">&#x27;no_db&#x27;</span>);   <span class="comment">-- 未选择数据库时返回 &#x27;no_db&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-NULLIF-相等时返回-NULL"><a href="#5-3-NULLIF-相等时返回-NULL" class="headerlink" title="5.3 NULLIF() - 相等时返回 NULL"></a>5.3 <code>NULLIF()</code> - 相等时返回 NULL</h3><p><strong>作用</strong>：如果两个值相等，返回 NULL；否则返回第一个值</p>
+<p><strong>语法</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">NULLIF</span>(值<span class="number">1</span>, 值<span class="number">2</span>)</span><br></pre></td></tr></table></figure>
+
+<p><strong>使用场景</strong>：将特定值转换为 NULL（常用于数据清洗）</p>
+<p><strong>示例</strong>：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">NULLIF</span>(<span class="number">5</span>, <span class="number">5</span>);                  <span class="comment">-- 结果：NULL（相等）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">NULLIF</span>(<span class="number">5</span>, <span class="number">3</span>);                  <span class="comment">-- 结果：5（不相等）</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">NULLIF</span>(<span class="string">&#x27;a&#x27;</span>, <span class="string">&#x27;b&#x27;</span>);              <span class="comment">-- 结果：&#x27;a&#x27;（不相等）</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文介绍了 MySQL 中最常用的 SQL 函数：</p>
+<ol>
+<li><strong>环境信息函数</strong>：<code>USER()</code>, <code>DATABASE()</code>, <code>VERSION()</code> - 快速了解当前连接信息</li>
+<li><strong>字符串截取</strong>：<code>SUBSTRING()</code>, <code>LEFT()</code>, <code>RIGHT()</code> - 灵活提取字符串片段</li>
+<li><strong>字符编码</strong>：<code>ASCII()</code>, <code>CHAR()</code> - 字符与数字编码的相互转换</li>
+<li><strong>长度计算</strong>：<code>LENGTH()</code>, <code>CHAR_LENGTH()</code> - 字节长度 vs 字符长度</li>
+<li><strong>条件判断</strong>：<code>IF()</code>, <code>IFNULL()</code>, <code>NULLIF()</code> - 让 SQL 逻辑更灵活</li>
+</ol>
+<p>掌握这些函数，可以让你在 SQL 查询中更加得心应手！</p>
+<hr>
+<p><strong>提示</strong>：在实际使用中，这些函数经常组合使用，比如 <code>ASCII(SUBSTRING(USER(), 1, 1))</code> 可以获取账号首字符的编码值。多练习组合使用，能解决很多实际问题！</p>
+
+    </div>
+
+    
+</div>
+    <div class="footer" id="footer">
+    <p><h4>Copyright © 2020 | Author: linxin | Theme By <a class="theme-author" target="_blank" rel="noopener" href="https://github.com/Xunzhuo/hexo-theme-coder" style="font-size:14px; color: #969696">Coder</a></h4>
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+        <span id="busuanzi_container_site_pv">Page Views: <span id="busuanzi_value_site_pv"></span></span>
+        <span class="post-meta-divider">|</span>
+        <span id="busuanzi_container_site_uv">Unique Visitors: <span id="busuanzi_value_site_uv"></span></span>
+    
+    <label class="el-switch el-switch-blue el-switch-sm" style="vertical-align: sub;">
+        <input type="checkbox" name="switch" id="update_style">
+        <span class="el-switch-style"></span>
+    </label>
+
+    <!--         <script type="text/javascript">
+    var cnzz_protocol = (("https:" == document.location.protocol) ? "https://" : "http://");
+    document.write(unescape("%3Cspan id='cnzz_stat_icon_1278548644'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "v1.cnzz.com/stat.php%3Fid%3D1278548644%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
+    </script> -->
+</p>
+</div>
+
+<input type="hidden" id="web_style" value="black">
+<input type="hidden" id="valine_appid" value="">
+<input type="hidden" id="valine_appKey" value="">
+
+<script src="/libs/jquery.min.js"></script>
+
+
+<script src="/libs/highlight/highlight.pack.js"></script>
+
+<script src='//cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+
+<script src="/js/js.js"></script>
+
+<style type="text/css">
+.v * {
+color: #698fca;
+}
+.v .vlist .vcard .vhead .vsys {
+color: #3a3e4a;
+}
+.v .vlist .vcard .vh .vmeta .vat {
+color: #638fd5;
+}
+.v .vlist .vcard .vhead .vnick {
+color: #6ba1ff;
+}
+.v a {
+color: #8696b1;
+}
+.v .vlist .vcard .vhead .vnick:hover {
+color: #669bfc;
+}
+</style>
+    <script type="text/javascript" color="173,174,173" opacity='1' zIndex="-2" count="99" src="//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js"></script>
+</body>
+</html>
