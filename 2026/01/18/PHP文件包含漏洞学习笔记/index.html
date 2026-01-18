@@ -28,12 +28,12 @@
  replay-btn" aria-hidden="true"></i></a>
     <div class="post-title">
         <p>
-            
+            PHP文件包含漏洞-学习笔记
         </p>
         <hr>
     </div>
     <div class="post-content">
-        <h1 id="PHP文件包含漏洞-学习笔记"><a href="#PHP文件包含漏洞-学习笔记" class="headerlink" title="PHP文件包含漏洞-学习笔记"></a>PHP文件包含漏洞-学习笔记</h1><p>核心结论：PHP文件包含漏洞的本质是「文件包含函数未对用户可控文件名做严格校验」，导致攻击者可通过构造路径&#x2F;伪协议，触发文件读取、代码执行等风险，其触发与底层文件解析逻辑、PHP配置、系统特性强相关。</p>
+        <p>核心结论：PHP文件包含漏洞的本质是「文件包含函数未对用户可控文件名做严格校验」，导致攻击者可通过构造路径&#x2F;伪协议，触发文件读取、代码执行等风险，其触发与底层文件解析逻辑、PHP配置、系统特性强相关。</p>
 <h2 id="一、漏洞基础（源码视角）"><a href="#一、漏洞基础（源码视角）" class="headerlink" title="一、漏洞基础（源码视角）"></a>一、漏洞基础（源码视角）</h2><h3 id="1-核心定义"><a href="#1-核心定义" class="headerlink" title="1. 核心定义"></a>1. 核心定义</h3><p>当PHP代码中使用 <code>include</code>&#x2F;<code>require</code> 等函数，且传入的文件名由用户控制（如 <code>$_GET[&#39;file&#39;]</code>），未经过滤直接拼接路径执行时，攻击者可构造恶意路径，实现「非预期文件包含」，进而泄露源码或执行恶意代码。</p>
 <h3 id="2-关键依赖（php-ini配置）"><a href="#2-关键依赖（php-ini配置）" class="headerlink" title="2. 关键依赖（php.ini配置）"></a>2. 关键依赖（php.ini配置）</h3><p>配置项直接决定漏洞利用范围，源码层面会通过全局变量判断是否允许对应操作：</p>
 <ul>
