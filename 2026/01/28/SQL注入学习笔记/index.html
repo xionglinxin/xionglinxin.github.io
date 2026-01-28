@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="google-site-verification" content="TZE0rZyIqLl10trYu3BWBWa1Vmz6HFwhb2OcNEK4u-s" />
+     <link rel="shortcut icon" href= /img/favicon.ico >
+    <title>
+        Wblog
+    </title>
+    <meta name="description" content= 终身学习，记录成长轨迹 >
+    <meta name="keywords" content= Blog,Hexo,技术,学习,linxin >
+    
+<link rel="stylesheet" href="/libs/highlight/styles/monokai-sublime.css">
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body id="bodyx">
+    <div class="hd posts">
+    <a href="/index.html"><i class="fa fa-home
+ replay-btn" aria-hidden="true"></i></a>
+    <div class="post-title">
+        <p>
+            SQL 注入学习笔记
+        </p>
+        <hr>
+    </div>
+    <div class="post-content">
+        <h1 id="SQL-注入学习笔记"><a href="#SQL-注入学习笔记" class="headerlink" title="SQL 注入学习笔记"></a>SQL 注入学习笔记</h1><h1 id="模块一：基础回显注入（GET-Error-Based）"><a href="#模块一：基础回显注入（GET-Error-Based）" class="headerlink" title="模块一：基础回显注入（GET Error-Based）"></a>模块一：基础回显注入（GET Error-Based）</h1><p><strong>涉及关卡</strong>：Less-1 ~ Less-4</p>
+<h2 id="一、核心操作流程"><a href="#一、核心操作流程" class="headerlink" title="一、核心操作流程"></a>一、核心操作流程</h2><p>注入的核心是突破 SQL 语句结构限制，获取数据回显，步骤可总结为“摸清结构→修复语法→探测信息→获取数据”。</p>
+<ol>
+<li><p><strong>确认闭合方式</strong>：这是注入的前提。通过输入单引号（’）、双引号（”）、单引号+括号（’)）、双引号+括号（”)），观察页面报错信息，反推 SQL 语句对输入参数的包裹方式。</p>
+</li>
+<li><p><strong>语法修复与探测</strong>：</p>
+<ul>
+<li><p>断句：输入闭合符触发语法错误，确认参数位置是否可注入；</p>
+</li>
+<li><p>修复：使用注释符（–+、#、%23）屏蔽语句尾部内容，使页面恢复正常，验证注入点有效性；</p>
+</li>
+<li><p>列数探测：通过 ORDER BY 语句结合二分法，确定查询结果的列数，为后续联合查询铺垫；</p>
+</li>
+<li><p>数据回显：利用 UNION SELECT 联合查询，将目标数据填充到回显位，实现数据泄露。</p>
+</li>
+</ul>
+</li>
+</ol>
+<h2 id="二、关键知识点"><a href="#二、关键知识点" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>Union 查询规则</strong>：用于合并多个 SELECT 语句的结果集，要求前后语句列数一致、数据类型兼容，否则会报错。</p>
+</li>
+<li><p><strong>多行数据合并</strong>：group_concat() 函数可将多行查询结果合并为一行输出，适合回显位有限的场景，搭配分隔符使用效果更佳。</p>
+</li>
+<li><p><strong>常用分隔符</strong>：推荐使用十六进制编码的分隔符，如 0x3a（冒号 :）、0x7e（波浪号 ~），避免与数据本身冲突。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展"><a href="#三、深度思考与拓展" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>如何通过报错信息精准反推闭合方式？若系统禁用错误回显，需通过布尔值差异（页面内容变化）验证结构。</p>
+</li>
+<li><p>列数探测优先于 Union 查询的原因：Union 要求列数匹配，只有确定列数后，才能构造合法语句占用回显位；回显位不足时，可通过 group_concat() 合并字段，或分批次查询数据。</p>
+</li>
+<li><p>数据库差异点：MySQL 支持 group_concat()，PostgreSQL 可用 string_agg()，SQL Server 需结合 FOR XML PATH 实现类似功能；Union 查询在各数据库中规则一致，但注释符略有差异。</p>
+</li>
+<li><p>元数据查询代价：通过 information_schema 枚举表名、列名时，会产生额外数据库请求，高频查询可能被日志监控捕捉，需控制查询频率。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点"><a href="#四、源码解析与复现要点" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构"><a href="#1-源码结构" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>入口文件：Less-1 至 Less-4 的 index.php，均通过 include(“..&#x2F;sql-connections&#x2F;sqli-connect.php”) 建立数据库连接（$con1）。</p>
+</li>
+<li><p>输入来源：通过 $_GET[‘id’] 获取参数，多数关卡会将输入（通常为过滤后的值）写入当前目录 result.txt，便于回溯。</p>
+</li>
+<li><p>核心 SQL 语句：</p>
+<ul>
+<li><p>Less-1：SELECT * FROM users WHERE id&#x3D;’$id’ LIMIT 0,1（单引号闭合）；</p>
+</li>
+<li><p>Less-2：SELECT * FROM users WHERE id&#x3D;$id LIMIT 0,1（数值型，无引号保护）；</p>
+</li>
+<li><p>Less-3：SELECT * FROM users WHERE id&#x3D;(‘$id’) LIMIT 0,1（单引号+括号闭合）；</p>
+</li>
+<li><p>Less-4：SELECT * FROM users WHERE id&#x3D;(“$id”) LIMIT 0,1（双引号+括号闭合）。</p>
+</li>
+</ul>
+</li>
+<li><p>回显逻辑：查询命中时直接输出 username 和 password，失败时打印 mysqli_error 信息，为错误回显注入提供入口。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索"><a href="#2-复现关键线索" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-1（单引号）：单引号触发报错，注释修复后页面恢复，联合查询可正常占用回显位；</p>
+</li>
+<li><p>Less-2（数值型）：非数字输入（如字母、符号）易触发语法错误，列数确定后可直接通过 Union 回显数据；</p>
+</li>
+<li><p>Less-3（单引号+括号）：需同时闭合单引号和括号（如 ‘)），报错信息与回显位用法同 Less-1；</p>
+</li>
+<li><p>Less-4（双引号+括号）：双引号闭合后现象与 Less-3 类似，需关注报错信息中引号类型的差异。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块二：报错与盲注（Blind-Double-Query）"><a href="#模块二：报错与盲注（Blind-Double-Query）" class="headerlink" title="模块二：报错与盲注（Blind &#x2F; Double Query）"></a>模块二：报错与盲注（Blind &#x2F; Double Query）</h1><p><strong>涉及关卡</strong>：Less-5 ~ Less-10</p>
+<h2 id="一、核心操作逻辑"><a href="#一、核心操作逻辑" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>当页面无直接数据回显时，需通过间接方式判断注入结果，分为报错注入和盲注两类场景。</p>
+<ul>
+<li><p><strong>报错注入</strong>：页面无数据回显，但保留错误提示功能时使用。通过构造非法语法，使数据库报错并泄露目标数据。</p>
+</li>
+<li><p><strong>盲注</strong>：页面无回显且无报错时启用，依赖页面微小差异或响应时间判断条件真假：</p>
+<ul>
+<li><p>布尔盲注：寻找页面内容差异（如是否显示“You are in…”），作为条件真假的判断依据；</p>
+</li>
+<li><p>时间盲注：利用 sleep() 函数制造响应时间差，是无任何信号时的终极手段。</p>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="二、关键知识点-1"><a href="#二、关键知识点-1" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>XML 报错注入</strong>：利用 updatexml() 函数的 XPath 格式校验漏洞，在 XPath 字符串中插入目标数据，因格式错误触发报错，泄露数据内容（如 updatexml(1,concat(0x7e,user(),0x7e),1)）。</p>
+</li>
+<li><p><strong>Double Query 报错</strong>：结合 count()、rand()、group by 函数，利用主键冲突机制引发报错，适用于早期 MySQL 版本，可绕过部分过滤。</p>
+</li>
+<li><p><strong>盲注核心函数</strong>：ascii()（转换字符为 ASCII 码）、substr()（截取字符串）、length()（获取字符串长度）、if(cond,true,false)（条件判断），是盲注数据遍历的核心工具。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-1"><a href="#三、深度思考与拓展-1" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>报错注入与盲注的成本差异：报错注入一次请求可泄露大量数据，效率高但依赖错误回显；盲注需逐字符遍历，请求量大，易被限流，需优化策略。</p>
+</li>
+<li><p>时间盲注的稳定性：网络抖动会影响响应时间判断，可通过设置合理 sleep 时长（如 3-5 秒）、多次验证结果，降低误判概率。</p>
+</li>
+<li><p>Less-9&#x2F;10 无布尔差异的解决方案：需依赖时间盲注或侧信道信息（如数据库日志、响应包大小），构造稳定的判断信号。</p>
+</li>
+<li><p>盲注优化方向：采用二分法遍历（将遍历次数从 O(N) 降至 O(log N)）、批量比较字符、利用并发请求或缓存减少重复查询，提升效率。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-1"><a href="#四、源码解析与复现要点-1" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构-1"><a href="#1-源码结构-1" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>入口与连接：同模块一，均通过 sqli-connect.php 建立连接，输入参数为 $_GET[‘id’]，多数页面会写入当前目录 result.txt（记录通常是过滤后的值）。</p>
+</li>
+<li><p>SQL 语句差异：</p>
+<ul>
+<li><p>Less-5：id&#x3D;’$id’（单引号闭合）；</p>
+</li>
+<li><p>Less-6：$id 被双引号包裹后，SQL 为 id&#x3D;$id（双引号闭合）；</p>
+</li>
+<li><p>Less-7：id&#x3D;((‘$id’))（三重括号+单引号闭合）；</p>
+</li>
+<li><p>Less-8&#x2F;9：id&#x3D;’$id’（单引号闭合）；</p>
+</li>
+<li><p>Less-10：$id 被双引号包裹后，SQL 为 id&#x3D;$id（双引号闭合）。</p>
+</li>
+</ul>
+</li>
+<li><p>回显策略：</p>
+<ul>
+<li><p>Less-5&#x2F;6：查询命中仅显示“You are in…”，失败打印错误信息，适合报错注入；</p>
+</li>
+<li><p>Less-8：仅条件为真时显示“You are in…”，构成布尔盲注场景；</p>
+</li>
+<li><p>Less-9&#x2F;10：无论条件真假均显示“You are in…”，只能通过时间盲注判断。</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-复现关键线索-1"><a href="#2-复现关键线索-1" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-5（单引号报错）：通过报错函数（updatexml、extractvalue）构造注入语句，从错误信息中提取数据；</p>
+</li>
+<li><p>Less-6（双引号报错）：闭合方式改为双引号，报错注入逻辑与 Less-5 一致，注意双引号闭合方式差异；</p>
+</li>
+<li><p>Less-7（文件写入）：需满足 secure_file_priv 配置允许写入，且有目录权限，通过联合查询或报错语句验证文件写入语法与权限限制；</p>
+</li>
+<li><p>Less-8（布尔盲注）：以“是否显示“You are in…””为信号，结合 substr、ascii 函数逐字符遍历数据；</p>
+</li>
+<li><p>Less-9&#x2F;10（时间盲注）：构造 if(条件,sleep(5),1) 语句，通过响应时间差判断条件真假，Less-10 需注意双引号闭合。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块三：POST-登录框注入"><a href="#模块三：POST-登录框注入" class="headerlink" title="模块三：POST 登录框注入"></a>模块三：POST 登录框注入</h1><p><strong>涉及关卡</strong>：Less-11 ~ Less-16</p>
+<h2 id="一、核心操作逻辑-1"><a href="#一、核心操作逻辑-1" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>POST 注入与 GET 注入核心原理一致，差异在于注入位置为 HTTP 请求体（表单数据），需关注表单字段的闭合方式与过滤规则。</p>
+<ul>
+<li><p><strong>注入位置定位</strong>：重点关注用户名（uname）、密码（passwd）字段，二者均可能直接拼接入 SQL 语句，形成注入点。</p>
+</li>
+<li><p><strong>万能密码绕过</strong>：利用逻辑 OR 构造恒真条件，如用户名输入“admin’ OR 1&#x3D;1 #”，注释掉后续密码判断语句，直接绕过登录认证。</p>
+</li>
+<li><p><strong>双注入点利用</strong>：若某一字段（如用户名）被过滤，可尝试在另一字段（如密码）注入；或通过用户名闭合语法，在密码字段验证注入链路的有效性。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-2"><a href="#二、关键知识点-2" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>核心 SQL 结构</strong>：多数登录框 SQL 为“SELECT … WHERE username&#x3D;’$u’ AND password&#x3D;’$p’”，注入需破坏 AND 逻辑，构造恒真条件。</p>
+</li>
+<li><p><strong>注释符使用差异</strong>：GET 请求中需用 –+（加号转义为空格），POST 请求中可直接使用 # 或 – （注意尾部空格），无需 URL 编码。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-2"><a href="#三、深度思考与拓展-2" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>盲注信号优化：登录成功&#x2F;失败的图标、提示文案差异，可作为布尔盲注信号，但需排除前端渲染干扰（如缓存、静态文案），确保信号稳定。</p>
+</li>
+<li><p>密码加密对注入的影响：若密码经哈希（MD5、SHA）处理后存储，注入需在加密前的参数位置进行，哈希后的字段无法直接注入；若前端加密，可尝试绕过加密逻辑或直接注入后端参数。</p>
+</li>
+<li><p>认证系统常见弱点：错误提示差异（如“用户名不存在”“密码错误”）可用于账户枚举；登录日志若记录原始输入，可能成为二次注入入口；参数化查询可彻底防御此类注入，核心是将用户输入与 SQL 语句分离。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-2"><a href="#四、源码解析与复现要点-2" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构-2"><a href="#1-源码结构-2" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>入口与提交：Less-11 至 Less-16 的 index.php 包含表单，通过 POST 方式提交至当前页面，数据库连接方式同前序模块。</p>
+</li>
+<li><p>输入来源：$_POST[‘uname’]（用户名）、$_POST[‘passwd’]（密码），多数页面会写入当前目录 result.txt（记录通常是过滤后的值）。</p>
+</li>
+<li><p>核心 SQL 语句（均含 LIMIT 0,1）：</p>
+<ul>
+<li><p>Less-11：username&#x3D;’$uname’ and password&#x3D;’$passwd’（单引号闭合，显错）；</p>
+</li>
+<li><p>Less-12：uname 被双引号包裹后，SQL 为 username&#x3D;($uname)（双引号+括号闭合，显错）；</p>
+</li>
+<li><p>Less-13：username&#x3D;(‘$uname’)（单引号+括号闭合，字段隐藏，仅显报错）；</p>
+</li>
+<li><p>Less-14：uname 被双引号包裹后，SQL 为 username&#x3D;$uname（双引号闭合，字段隐藏，仅显报错）；</p>
+</li>
+<li><p>Less-15&#x2F;16：分别与 Less-11&#x2F;12 闭合方式一致，但无错误回显与字段输出，仅通过图标区分登录成功&#x2F;失败。</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-复现关键线索-2"><a href="#2-复现关键线索-2" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-11（单引号显错）：输入单引号触发报错，修复语法后可通过联合查询回显用户名&#x2F;密码；</p>
+</li>
+<li><p>Less-12（双引号括号显错）：双引号+括号闭合后触发报错，联合查询可替换字段回显；</p>
+</li>
+<li><p>Less-13（单引号括号报错）：无字段回显，需通过报错函数（updatexml）提取数据，页面仅展示登录成功图标；</p>
+</li>
+<li><p>Less-14（双引号报错）：双引号闭合，报错注入逻辑与 Less-13 一致，无字段直出；</p>
+</li>
+<li><p>Less-15（布尔盲注）：以登录成功&#x2F;失败图标为信号，构造布尔条件遍历数据；</p>
+</li>
+<li><p>Less-16（双引号+括号）：页面仍有成功&#x2F;失败图标差异，属于布尔盲注场景；也可用时间盲注作为备选。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块四：特殊语句注入（Update-Insert-Cookie）"><a href="#模块四：特殊语句注入（Update-Insert-Cookie）" class="headerlink" title="模块四：特殊语句注入（Update&#x2F;Insert&#x2F;Cookie）"></a>模块四：特殊语句注入（Update&#x2F;Insert&#x2F;Cookie）</h1><p><strong>涉及关卡</strong>：Less-17 ~ Less-22</p>
+<h2 id="一、核心操作逻辑-2"><a href="#一、核心操作逻辑-2" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>此类注入针对非查询语句（Update、Insert）及隐蔽注入点（Header、Cookie），核心难点在于语句执行条件与注入位置的隐蔽性。</p>
+<ul>
+<li><p><strong>非查询语句注入</strong>：Update（改密码）、Insert（注册&#x2F;日志）语句不支持 Union 查询，需依赖报错注入泄露数据；且需保证语句能正常执行（如 Update 需 WHERE 子句匹配记录），否则报错函数无法触发。</p>
+</li>
+<li><p><strong>隐蔽注入点利用</strong>：开发者常忽略 Header（User-Agent、Referer）、Cookie 字段的过滤，可通过修改这些字段注入；若字段经编码（Base64），需先编码注入语句再提交。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-3"><a href="#二、关键知识点-3" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>Insert 注入要点</strong>：语句格式为“INSERT INTO table VALUES (‘$inj’, …)”，注入时需补齐后续字段值，保证列数匹配，避免语句因字段缺失无法执行。</p>
+</li>
+<li><p><strong>Cookie 注入注意事项</strong>：Cookie 字段可能经 Base64 或序列化处理，注入前需明确编码规则，确保注入语句经解码后能正常闭合语法。</p>
+</li>
+<li><p><strong>语句执行条件</strong>：Update 注入需保证 WHERE 子句匹配到目标记录（如用户名存在），否则语句不执行，注入失效；Insert 注入需满足表结构约束（如非空字段、数据类型）。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-3"><a href="#三、深度思考与拓展-3" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>非查询语句依赖报错的原因：Update、Insert 语句无结果集返回，无法通过 Union 回显，只能借助语法错误或函数报错泄露信息；无报错时，可通过语句执行结果（如密码修改成功、日志记录变化）验证注入。</p>
+</li>
+<li><p>Header&#x2F;Cookie 注入被忽略的原因：多数开发者仅过滤 URL、表单参数，忽视 Header、Cookie 等“非用户直接输入”字段；现实系统中，这些字段若被写入数据库（如 User-Agent 日志），可能形成二次注入。</p>
+</li>
+<li><p>编码的安全性误区：Base64、序列化仅为数据传输&#x2F;存储格式，并非安全防护手段，解码后若未过滤，仍会触发注入；且编码可能掩盖敏感字符，绕过简单黑名单过滤。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-3"><a href="#四、源码解析与复现要点-3" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构-3"><a href="#1-源码结构-3" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>Less-17（Update 注入）：密码重置功能，uname 经 check_input() 过滤（截断、魔术引号、数值判断），passwd 直接拼接入 Update 语句：</p>
+<ul>
+<li><p>查询语句：SELECT username,password FROM users WHERE username&#x3D;$uname LIMIT 0,1；</p>
+</li>
+<li><p>更新语句：UPDATE users SET password&#x3D;’$passwd’ WHERE username&#x3D;’$row1’。</p>
+</li>
+</ul>
+</li>
+<li><p>Less-18&#x2F;19（Header 注入）：登录成功后执行 Insert 语句，User-Agent&#x2F;Referer 未过滤：</p>
+<ul>
+<li><p>Less-18：INSERT INTO security.uagents (uagent, ip_address, username) VALUES (‘$uagent’,’$IP’,$uname)；</p>
+</li>
+<li><p>Less-19：INSERT INTO security.referers (referer, ip_address) VALUES (‘$uagent’,’$IP’)。</p>
+</li>
+</ul>
+</li>
+<li><p>Less-20（Cookie 注入）：登录成功后设置 Cookie（uname&#x3D;用户名），回访时直接拼接入查询：SELECT * FROM users WHERE username&#x3D;’$cookee’。</p>
+</li>
+<li><p>Less-21（Cookie Base64 注入）：Cookie 存储用户名的 Base64 编码，读取后经 base64_decode 处理，查询语句为：SELECT * FROM users WHERE username&#x3D;(‘$cookee’)。</p>
+</li>
+<li><p>Less-22（Cookie Base64+双引号注入）：Cookie 解码后再用双引号包裹，查询语句为：SELECT * FROM users WHERE username&#x3D;”$cookee1”。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索-3"><a href="#2-复现关键线索-3" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-17（密码重置 Update）：uname 过滤严格，passwd 为注入点；需先确认用户名存在（使 Update 语句执行），通过报错函数提取数据；</p>
+</li>
+<li><p>Less-18（User-Agent 注入）：登录成功后，User-Agent 被写入数据库，构造报错语句，从错误信息验证注入成功；</p>
+</li>
+<li><p>Less-19（Referer 注入）：Referer 字段写入 referers 表，报错信息可正常回显，注入逻辑与 Less-18 一致；</p>
+</li>
+<li><p>Less-20（Cookie 注入）：登录后修改 Cookie 中的 uname 值，构造闭合语句，通过页面回显判断注入效果；</p>
+</li>
+<li><p>Less-21（Cookie Base64）：注入语句需先进行 Base64 编码，确保解码后能正确闭合单引号+括号，否则无法触发注入；</p>
+</li>
+<li><p>Less-22（Cookie Base64+双引号）：解码后的注入语句需闭合双引号，注意编码一致性与双引号包裹规则，避免语法错误。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块五：过滤与绕过（Filters）"><a href="#模块五：过滤与绕过（Filters）" class="headerlink" title="模块五：过滤与绕过（Filters）"></a>模块五：过滤与绕过（Filters）</h1><p><strong>涉及关卡</strong>：Less-23 ~ Less-28a</p>
+<h2 id="一、核心操作逻辑-3"><a href="#一、核心操作逻辑-3" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>此类关卡通过黑名单过滤敏感词（注释符、逻辑词、关键字），核心是寻找等价替代方案或混淆写法，绕过过滤规则，同时保证 SQL 语句合法。</p>
+<ul>
+<li><p><strong>黑名单绕过思路</strong>：针对过滤的敏感词，使用等价符号、双写、编码、空格替代等方式，构造能被数据库解析但不被过滤规则识别的语句。</p>
+</li>
+<li><p><strong>无注释符闭合技巧</strong>：注释符被禁时，可利用 SQL 语法特性闭合尾部语句（如用 ‘1 闭合最后的单引号，使尾部语法合法）。</p>
+</li>
+</ul>
+<h2 id="二、关键绕过技巧"><a href="#二、关键绕过技巧" class="headerlink" title="二、关键绕过技巧"></a>二、关键绕过技巧</h2><table>
+<thead>
+<tr>
+<th>过滤类型</th>
+<th>过滤内容</th>
+<th>绕过方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>注释符过滤</td>
+<td>#、–</td>
+<td>使用 %00（空字符）截断，或通过语法闭合尾部语句</td>
+</tr>
+<tr>
+<td>逻辑词过滤</td>
+<td>AND、OR</td>
+<td>等价运算符：&amp;&amp;（%26%26）、</td>
+</tr>
+<tr>
+<td>空格过滤</td>
+<td>空格</td>
+<td>%09（Tab）、%0a（换行）、&#x2F;**&#x2F;（注释空格）、括号包裹关键字</td>
+</tr>
+<tr>
+<td>关键字过滤</td>
+<td>UNION、SELECT</td>
+<td>双写：uniunionon、selselectect；大小写混合：Union、SeLeCt</td>
+</tr>
+</tbody></table>
+<h2 id="三、深度思考与拓展-4"><a href="#三、深度思考与拓展-4" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>黑名单过滤的局限性：黑名单无法覆盖所有等价替代方案，且易被绕过；过滤逻辑若存在漏洞（如只替换一次、大小写不敏感），会直接失效。等价替代成功的核心是“数据库能解析，过滤规则无法识别”。</p>
+</li>
+<li><p>过滤层级与编码影响：过滤发生在应用层时，需关注输入编码与过滤顺序（如先解码后过滤，需在编码前构造绕过语句）；WAF 层过滤则可能需结合 URL 编码、参数污染等方式绕过。</p>
+</li>
+<li><p>白名单策略优势：相比黑名单，白名单仅允许合法输入（如仅允许数字、字母），安全性更高，但需兼顾业务灵活性；常见误区是白名单规则不严谨（如遗漏特殊字符、允许编码后的恶意内容）。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-4"><a href="#四、源码解析与复现要点-4" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构与过滤规则"><a href="#1-源码结构与过滤规则" class="headerlink" title="1. 源码结构与过滤规则"></a>1. 源码结构与过滤规则</h3><ul>
+<li><p>Less-23：通过 preg_replace 移除 # 和 – 注释符，SQL 仍为 id&#x3D;’$id’，需无注释闭合尾部；</p>
+</li>
+<li><p>Less-24（二次注入）：注册时用 mysqli_real_escape_string 过滤用户名并写入数据库，改密码时直接读取 session 中的用户名拼接入 Update 语句（UPDATE users SET password&#x3D;’$pass’ WHERE username&#x3D;’$username’），形成存储型二次注入；</p>
+</li>
+<li><p>Less-25：blacklist() 函数正则删除 OR&#x2F;AND（不区分大小写），可通过双写或等价运算符绕过；</p>
+</li>
+<li><p>Less-26&#x2F;26a：过滤 OR&#x2F;AND、&#x2F;**&#x2F;、–、#、空白字符、斜杠，SQL 分别为 id&#x3D;’$id’（Less-26）、id&#x3D;(‘$id’)（Less-26a），需用括号、非空白分隔符绕过；</p>
+</li>
+<li><p>Less-27&#x2F;27a：强过滤 SELECT&#x2F;UNION（大小写全覆盖）+ 去空格，需双写、大小写混合+括号绕过；</p>
+</li>
+<li><p>Less-28：先移除注释符与空格&#x2F;加号，再过滤 union\s+select（不区分大小写），SQL 为 id&#x3D;(‘$id’)；</p>
+</li>
+<li><p>Less-28a：仅过滤 union\s+select（不去空格&#x2F;注释），SQL 为 id&#x3D;(‘$id’)。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索-4"><a href="#2-复现关键线索-4" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-23（禁注释）：用语法闭合替代注释（如 ‘1’ OR 1&#x3D;1 ‘），使尾部单引号被闭合，语句合法；</p>
+</li>
+<li><p>Less-24（二次注入）：注册时用户名输入“admin’#”（被转义为 admin&#39;# 存入数据库），改密码时 session 读取用户名为 admin&#39;#，拼接入语句后注释掉后续内容，实现密码重置；</p>
+</li>
+<li><p>Less-25（过滤 OR&#x2F;AND）：用 anandd、oorr 双写，或 &amp;&amp;、|| 等价运算符，维持逻辑判断功能；</p>
+</li>
+<li><p>Less-26（过滤空格）：用括号包裹关键字（如 (select(1)from(users))），或非空白分隔符（%09）替代空格；</p>
+</li>
+<li><p>Less-27（过滤 UNION&#x2F;SELECT）：用 UniOnSelEcT 双写+大小写混合，搭配括号绕过过滤；</p>
+</li>
+<li><p>Less-28（过滤 union\s+select + 去空格&#x2F;注释）：换行会被 \s 匹配；可用 union(select…) 这类无空白写法绕过。</p>
+</li>
+<li><p>Less-28a（仅过滤 union\s+select）：可用注释或括号拆分关键字（如 union&#x2F;**&#x2F;select、union(select…)）绕过。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块六：WAF-与转义（WAF-Escaping）"><a href="#模块六：WAF-与转义（WAF-Escaping）" class="headerlink" title="模块六：WAF 与转义（WAF &#x2F; Escaping）"></a>模块六：WAF 与转义（WAF &#x2F; Escaping）</h1><p><strong>涉及关卡</strong>：Less-29 ~ Less-37</p>
+<h2 id="一、核心操作逻辑-4"><a href="#一、核心操作逻辑-4" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>此类关卡聚焦 WAF 绕过与字符转义漏洞，核心是利用解析差异、编码特性，突破 WAF 校验与转义函数的防御，触发注入。</p>
+<ul>
+<li><p><strong>HPP 绕过</strong>：利用 WAF 与后端服务器对多参数的解析差异，构造多个同名参数，使 WAF 校验合法参数，后端执行恶意参数。</p>
+</li>
+<li><p><strong>宽字节注入</strong>：在 GBK 编码环境下，利用多字节特性“吃掉”转义符（\），使单引号逃逸，突破 addslashes、mysqli_real_escape_string 的防御。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-4"><a href="#二、关键知识点-4" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>HPP（HTTP 参数污染）</strong>：不同服务端对多参数的处理逻辑不同，ASP.NET 接收所有值，PHP&#x2F;Apache 通常取最后一个值；WAF 若仅校验第一个参数，可构造 ?id&#x3D;1&amp;id&#x3D;evil，绕过 WAF 执行恶意注入。</p>
+</li>
+<li><p><strong>宽字节注入原理</strong>：GBK 编码中，部分双字节组合会被解析为汉字，如 %df（0xDF）+ \（0x5C）&#x3D; 汉字“ß”（0xDF5C）。转义函数会给单引号加 \（变为 &#39;），若数据库编码为 GBK，%df&#39; 会被解析为 ß’，单引号成功逃逸。</p>
+</li>
+<li><p><strong>转义函数局限性</strong>：addslashes、mysqli_real_escape_string 的防御效果依赖数据库连接字符集，若字符集不匹配（如前端 UTF-8、后端 GBK），易触发宽字节漏洞。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-5"><a href="#三、深度思考与拓展-5" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>解析顺序错位的风险：同一请求在 WAF、代理、应用服务器中的解析顺序不同，可能导致 WAF 认为合法，后端执行恶意代码（如 HPP、编码解析差异）；需梳理完整请求链路的解析规则，寻找绕过突破口。</p>
+</li>
+<li><p>字符集与转义的关系：mysqli_real_escape_string 会根据当前数据库连接字符集处理特殊字符，若连接字符集为 GBK，会对 \ 进行转义，但仍可被宽字节吃掉；若字符集为 UTF-8，宽字节注入失效。</p>
+</li>
+<li><p>历史防护手段的局限：魔术引号（magic_quotes_gpc）作为早期防御手段，仅对 GET、POST、Cookie 参数转义，无法覆盖 Header、日志等注入点，且在宽字节环境下失效，已被 PHP 废弃。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-5"><a href="#四、源码解析与复现要点-5" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构与防御逻辑"><a href="#1-源码结构与防御逻辑" class="headerlink" title="1. 源码结构与防御逻辑"></a>1. 源码结构与防御逻辑</h3><ul>
+<li><p>Less-29&#x2F;30&#x2F;31（WAF+HPP）：WAF 逻辑在 login.php 中，通过 java_implimentation() 取查询串里的第一个 id 并做纯数字白名单校验；后端实际使用 $_GET[‘id’]（通常取最后一个同名参数）拼接入 SQL，形成 HPP 绕过：</p>
+<ul>
+<li><p>Less-29：SQL 为 id&#x3D;’$id’（单引号闭合）；</p>
+</li>
+<li><p>Less-30：SQL 为 id&#x3D;”$id”（双引号闭合）；</p>
+</li>
+<li><p>Less-31：SQL 为 id&#x3D;(“$id”)（双引号+括号闭合）。</p>
+</li>
+</ul>
+</li>
+<li><p>Less-32：自定义 check_addslashes 处理 + SET NAMES gbk（宽字节前提）；</p>
+</li>
+<li><p>Less-33：addslashes 处理 + SET NAMES gbk（宽字节前提）；</p>
+</li>
+<li><p>Less-34：POST 表单，addslashes 处理 + SET NAMES gbk；</p>
+</li>
+<li><p>Less-37：POST 表单，mysqli_real_escape_string 处理 + SET NAMES gbk；</p>
+</li>
+<li><p>Less-35：SQL 为 id&#x3D;$id（数值型），addslashes 对数值型无效；</p>
+</li>
+<li><p>Less-36：SQL 为 id&#x3D;’$id’（字符串），mysqli_real_escape_string + GBK 仍可触发宽字节绕过。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索-5"><a href="#2-复现关键线索-5" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-29（HPP 绕过）：在 login.php 构造 URL ?id&#x3D;1&amp;id&#x3D;’ OR 1&#x3D;1 #，WAF 校验第一个 id&#x3D;1 合法，后端执行第二个恶意参数触发注入；</p>
+</li>
+<li><p>Less-32（宽字节）：构造注入语句 %df’ OR 1&#x3D;1 #，转义后变为 %df&#39;，GBK 编码下解析为 ß’，单引号逃逸，语句合法；</p>
+</li>
+<li><p>Less-35（数值型转义失效）：直接输入 id&#x3D;1 OR 1&#x3D;1，无需闭合引号，转义函数不影响数值型参数，语句正常执行，回显所有数据。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块七：堆叠注入（Stacked-Injection）"><a href="#模块七：堆叠注入（Stacked-Injection）" class="headerlink" title="模块七：堆叠注入（Stacked Injection）"></a>模块七：堆叠注入（Stacked Injection）</h1><p><strong>涉及关卡</strong>：Less-38 ~ Less-45</p>
+<h2 id="一、核心操作逻辑-5"><a href="#一、核心操作逻辑-5" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>堆叠注入通过分号（;）分隔多条 SQL 语句，使后端同时执行多个语句，核心前提是后端使用支持多语句执行的函数（如 mysqli_multi_query），可实现插入、更新、删除等高危操作。</p>
+<ul>
+<li><p><strong>可行性验证</strong>：先执行延时语句（如 ; SELECT sleep(5)），观察响应时间，判断后端是否支持多语句执行。</p>
+</li>
+<li><p><strong>权限利用</strong>：堆叠注入可执行非查询语句，需结合数据库权限，实现数据篡改（UPDATE）、权限提升（CREATE USER）、表删除（DROP TABLE）等操作。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-5"><a href="#二、关键知识点-5" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>多语句执行函数</strong>：MySQL 中 mysqli_multi_query 支持多语句执行，mysqli_query 仅执行第一条语句；PDO 需开启 ATTR_EMULATE_PREPARES 才能支持多语句，默认禁用。</p>
+</li>
+<li><p><strong>结果集特性</strong>：后端通常仅读取第一条语句的结果集，后续语句虽执行但无回显，需通过间接方式（如数据变化、日志）验证执行效果。</p>
+</li>
+<li><p><strong>权限限制</strong>：堆叠注入的危害依赖数据库权限，若应用账户仅拥有查询权限，无法执行 UPDATE、DROP 等高危语句，需遵循最小权限原则防御。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-6"><a href="#三、深度思考与拓展-6" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>生产环境禁用多语句的原因：多语句执行会大幅扩大注入危害，从数据泄露升级为数据篡改、系统瘫痪；应用侧误开启多语句的场景包括：使用 mysqli_multi_query 替代 mysqli_query、配置不当允许多语句执行。</p>
+</li>
+<li><p>堆叠注入与常规注入的风险边界：常规注入多局限于查询语句，堆叠注入可执行任意 SQL 语句，风险覆盖数据泄露、篡改、销毁，且难以通过回显监控；需结合数据库审计、权限管控防御。</p>
+</li>
+<li><p>驱动差异影响：不同数据库驱动对多语句的支持不同，如 ODBC 部分版本支持多语句，JDBC 需配置 allowMultiQueries&#x3D;true 才能开启，需针对驱动特性调整注入策略。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-6"><a href="#四、源码解析与复现要点-6" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构-4"><a href="#1-源码结构-4" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>Less-38 ~ Less-41（GET 堆叠）：均使用 mysqli_multi_query 执行 SQL，手动建立数据库连接，SQL 闭合方式不同：<br>后端仅读取第一条语句结果集，后续语句后台执行。</p>
+<ul>
+<li><p>Less-38：id&#x3D;’$id’（单引号）；</p>
+</li>
+<li><p>Less-39：id&#x3D;$id（数值型）；</p>
+</li>
+<li><p>Less-40：id&#x3D;(‘$id’)（单引号+括号）；</p>
+</li>
+<li><p>Less-41：id&#x3D;$id（数值型）。</p>
+</li>
+</ul>
+</li>
+<li><p>Less-42 ~ Less-45（POST 堆叠）：登录流程分散在多个文件，login.php 使用 mysqli_multi_query 执行 SQL，用户名经 mysqli_real_escape_string 过滤，密码字段未过滤，为堆叠注入入口；通过 Auth Cookie 和 session 维持登录态，可触发后续改密、重置功能。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索-6"><a href="#2-复现关键线索-6" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-38（GET 堆叠）：构造注入语句 ‘; UPDATE users SET password&#x3D;’123456’ WHERE username&#x3D;’admin’; #，执行后通过登录验证密码是否修改，验证堆叠效果；</p>
+</li>
+<li><p>Less-42（POST 堆叠）：密码字段输入 ‘; INSERT INTO users (username,password) VALUES (‘test’,’test’); #，登录成功后执行插入语句，通过数据库查询验证新用户是否创建。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块八：ORDER-BY-注入"><a href="#模块八：ORDER-BY-注入" class="headerlink" title="模块八：ORDER BY 注入"></a>模块八：ORDER BY 注入</h1><p><strong>涉及关卡</strong>：Less-46 ~ Less-53</p>
+<h2 id="一、核心操作逻辑-6"><a href="#一、核心操作逻辑-6" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>ORDER BY 注入针对排序字段，核心特点是无法直接使用 Union 查询，需通过报错、布尔差异（排序结果变化）判断注入条件真假，提取数据。</p>
+<ul>
+<li><p><strong>报错注入方式</strong>：在 ORDER BY 后构造非法语法（如 rand(true)、updatexml 函数），触发数据库报错，泄露数据。</p>
+</li>
+<li><p><strong>盲注方式</strong>：利用 IF 函数构造条件排序（如 ORDER BY IF(cond, username, password)），通过排序结果（如用户名顺序变化）判断条件真假，逐字符遍历数据。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-6"><a href="#二、关键知识点-6" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>ORDER BY 语法限制</strong>：排序字段可直接写列名、表达式或数字（代表查询结果的列索引），无法直接拼接 Union 查询，需借助其他函数触发信息泄露。</p>
+</li>
+<li><p><strong>排序结果判断</strong>：布尔盲注的核心是建立稳定的排序信号，如以某列数据的升降序变化，作为条件真假的判断依据，避免因数据重复导致误判。</p>
+</li>
+<li><p><strong>白名单防御</strong>：若排序字段被白名单限制（仅允许指定列名），注入面会大幅收缩，需通过列名枚举、别名构造等方式突破。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-7"><a href="#三、深度思考与拓展-7" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>ORDER BY 适合布尔信号的原因：排序结果直接影响页面展示（如表格数据顺序），信号直观且稳定；但无法直接回显数据，需逐字符遍历，效率低于报错注入。</p>
+</li>
+<li><p>白名单限制的突破思路：若排序字段支持别名（如 SELECT username AS u FROM users ORDER BY u），可尝试构造别名注入；或寻找未被白名单覆盖的排序表达式（如函数结果排序）。</p>
+</li>
+<li><p>安全设计方案：排序字段应使用服务器端枚举映射（如接收 1&#x2F;2 代表 username&#x2F;password），避免直接将用户输入作为排序字段；标识符（列名&#x2F;表名）无法参数化时，需严格校验输入，仅允许合法值。</p>
+</li>
+</ul>
+<h2 id="四、源码解析与复现要点-7"><a href="#四、源码解析与复现要点-7" class="headerlink" title="四、源码解析与复现要点"></a>四、源码解析与复现要点</h2><h3 id="1-源码结构-5"><a href="#1-源码结构-5" class="headerlink" title="1. 源码结构"></a>1. 源码结构</h3><ul>
+<li><p>输入参数：通过 $_GET[‘sort’] 获取排序字段，多数页面会写入当前目录 result.txt（记录通常是过滤后的值）。</p>
+</li>
+<li><p>核心 SQL 语句：</p>
+<ul>
+<li><p>数值型排序：Less-46&#x2F;48&#x2F;50&#x2F;52：SELECT * FROM users ORDER BY $id；</p>
+</li>
+<li><p>字符型排序：Less-47&#x2F;49&#x2F;51&#x2F;53：SELECT * FROM users ORDER BY ‘$id’。</p>
+</li>
+</ul>
+</li>
+<li><p>执行与回显：Less-46<del>49 使用 mysqli_query（错误直接回显）；Less-50</del>53 使用 mysqli_multi_query（支持堆叠，仅展示第一条结果集）；页面固定输出 users 表数据，通过排序顺序差异构造盲注信号。</p>
+</li>
+</ul>
+<h3 id="2-复现关键线索-7"><a href="#2-复现关键线索-7" class="headerlink" title="2. 复现关键线索"></a>2. 复现关键线索</h3><ul>
+<li><p>Less-46（数值型报错）：构造 sort&#x3D;rand(updatexml(1,concat(0x7e,user(),0x7e),1))，触发 XML 报错，泄露当前数据库用户；</p>
+</li>
+<li><p>Less-48（盲注）：构造 sort&#x3D;IF(ascii(substr((select username from users limit 0,1),1,1))&#x3D;97, username, password)，若用户名首字符为 ‘a’（ASCII 97），则按 username 排序，否则按 password 排序，通过页面数据顺序判断条件真假。</p>
+</li>
+</ul>
+<hr>
+<h1 id="模块九：Challenges（实战模拟）"><a href="#模块九：Challenges（实战模拟）" class="headerlink" title="模块九：Challenges（实战模拟）"></a>模块九：Challenges（实战模拟）</h1><p><strong>涉及关卡</strong>：Less-54 ~ Less-65</p>
+<h2 id="一、核心操作逻辑-7"><a href="#一、核心操作逻辑-7" class="headerlink" title="一、核心操作逻辑"></a>一、核心操作逻辑</h2><p>实战模拟关卡的核心特点是环境动态化（随机表名&#x2F;列名）与资源受限（请求次数限制），需结合前序模块的注入技巧，制定高效策略，在有限次数内获取目标数据（secret 字段）。</p>
+<ul>
+<li><p><strong>高效信息收集</strong>：优先通过报错注入一次性获取表名、列名等结构信息，避免逐字符盲注浪费请求次数。</p>
+</li>
+<li><p><strong>盲注优化</strong>：请求次数紧张时，采用二分法遍历，减少请求量；利用批量比较、并发请求提升效率。</p>
+</li>
+</ul>
+<h2 id="二、关键知识点-7"><a href="#二、关键知识点-7" class="headerlink" title="二、关键知识点"></a>二、关键知识点</h2><ul>
+<li><p><strong>动态环境适配</strong>：每次重置关卡会随机生成表名（如 challenges_xxxx）和 secret 列名（如 secret_xxxx），需先查询 information_schema 元数据，获取目标表&#x2F;列名，再提取数据。</p>
+</li>
+<li><p><strong>请求次数管控</strong>：每关在源码中通过 $times 控制次数：Less-54 为 10，Less-55<del>57 为 14，Less-58</del>61 为 5，Less-62~65 为 130；超限会清空 Cookie 并重置环境，需规划查询步骤，优先获取核心信息（表名→列名→secret 数据）。</p>
+</li>
+<li><p><strong>元数据查询优化</strong>：information_schema 表数据量大，高频查询效率低，可通过 LIMIT 限制结果集，或缓存查询结果，减少重复请求。</p>
+</li>
+</ul>
+<h2 id="三、深度思考与拓展-8"><a href="#三、深度思考与拓展-8" class="headerlink" title="三、深度思考与拓展"></a>三、深度思考与拓展</h2><ul>
+<li><p>动态表名&#x2F;列名的信息收集顺序：优先查询 information_schema.tables 获取 challenges 库下的随机表名，再查询 information_schema.columns 获取该表的 secret 列名，最后提取 secret 数据，避免无意义遍历。</p>
+</li>
+<li><p>最小可行信息集定义：在请求次数限制下，核心信息为“目标表名+secret 列名”，无需枚举所有表&#x2F;列；若无法报错注入，需用最少请求获取表名、列名的长度与首字符，逐步缩小范围。</p>
+</li>
+<li><p>自动化脚本设计：脚本需支持动态获取表&#x2F;列名、二分法盲注、失败重试、请求频率控制，应对速率限制与环境重置；同时需处理噪声（如网络抖动、页面渲染差异），确保数据准确性。</p>
+</li>
+</ul>
+
+    </div>
+
+    
+</div>
+    <div class="footer" id="footer">
+    <p><h4>Copyright © 2020 linxin | 主题 By <a class="theme-author" target="_blank" rel="noopener" href="https://github.com/Xunzhuo/hexo-theme-coder" style="font-size:14px; color: #969696">Coder</a></h4>
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+        <span id="busuanzi_container_site_pv">浏览量: <span id="busuanzi_value_site_pv"></span></span>
+        <span class="post-meta-divider">|</span>
+        <span id="busuanzi_container_site_uv">访客数: <span id="busuanzi_value_site_uv"></span></span>
+    
+    <label class="el-switch el-switch-blue el-switch-sm" style="vertical-align: sub;">
+        <input type="checkbox" name="switch" id="update_style">
+        <span class="el-switch-style"></span>
+    </label>
+
+    <!--         <script type="text/javascript">
+    var cnzz_protocol = (("https:" == document.location.protocol) ? "https://" : "http://");
+    document.write(unescape("%3Cspan id='cnzz_stat_icon_1278548644'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "v1.cnzz.com/stat.php%3Fid%3D1278548644%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
+    </script> -->
+</p>
+</div>
+
+<input type="hidden" id="web_style" value="black">
+<input type="hidden" id="valine_appid" value="">
+<input type="hidden" id="valine_appKey" value="">
+
+<script src="/libs/jquery.min.js"></script>
+
+
+<script src="/libs/highlight/highlight.pack.js"></script>
+
+<script src='//cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+
+<script src="/js/js.js"></script>
+
+<style type="text/css">
+.v * {
+color: #698fca;
+}
+.v .vlist .vcard .vhead .vsys {
+color: #3a3e4a;
+}
+.v .vlist .vcard .vh .vmeta .vat {
+color: #638fd5;
+}
+.v .vlist .vcard .vhead .vnick {
+color: #6ba1ff;
+}
+.v a {
+color: #8696b1;
+}
+.v .vlist .vcard .vhead .vnick:hover {
+color: #669bfc;
+}
+</style>
+    <script type="text/javascript" color="173,174,173" opacity='1' zIndex="-2" count="99" src="//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js"></script>
+</body>
+</html>
