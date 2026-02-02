@@ -91,7 +91,9 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
-            mermaid.initialize({"theme":"default","startOnLoad":true});
+            const mermaidOptions = {"theme":"default","startOnLoad":true};
+            mermaid.initialize(Object.assign({ startOnLoad: false }, mermaidOptions));
+            mermaid.run({ querySelector: '.mermaid' });
         }
     </script>
 
