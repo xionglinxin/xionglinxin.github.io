@@ -485,6 +485,23 @@ a {
   margin-bottom: 0;
   margin-top: 0;
 }
+.post-content .mermaid {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #3f3f3f;
+  border-radius: 8px;
+  background: #2b2b2b;
+  overflow-x: auto;
+  text-align: center;
+}
+.post-content .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.bg_while .post-content .mermaid {
+  border-color: #e1e4e8;
+  background: #f6f8fa;
+}
 .post-content input::-webkit-inner-spin-button,
 .post-content input::-webkit-outer-spin-button {
   -webkit-appearance: none;
