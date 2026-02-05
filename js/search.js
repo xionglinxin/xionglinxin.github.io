@@ -56,14 +56,15 @@ var searchFunc = function (path, search_id, content_id) {
                     }
                     var orig_data_title = data.title.trim();
                     var data_title = orig_data_title.toLowerCase();
-                    var orig_data_content = data.content.trim().replace(/<[^>]+>/g, "");
+                    var orig_data_content = (data.content || "").trim().replace(/<[^>]+>/g, "");
                     var data_content = orig_data_content.toLowerCase();
                     var data_url = data.url;
                     var index_title = -1;
                     var index_content = -1;
                     var first_occur = -1;
-                    // only match artiles with not empty contents
-                    if (data_content !== '') {
+                    if (data_title === '' && data_content === '') {
+                        isMatch = false;
+                    } else {
                         keywords.forEach(function (keyword, i) {
                             index_title = data_title.indexOf(keyword);
                             index_content = data_content.indexOf(keyword);
@@ -80,8 +81,6 @@ var searchFunc = function (path, search_id, content_id) {
                                 // content_index.push({index_content:index_content, keyword_len:keyword_len});
                             }
                         });
-                    } else {
-                        isMatch = false;
                     }
                     // 0x05. show search results
                     if (isMatch) {
